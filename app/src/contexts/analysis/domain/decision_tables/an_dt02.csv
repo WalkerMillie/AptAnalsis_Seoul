@@ -1,0 +1,9 @@
+# [GENERATED 스텁] AN-DT02 토지거래허가구역 여부 (kind=flag). 행(데이터)을 채워라.
+version,effective_date,complex_id,ltz_applies
+# 토허구역은 '단지별 사실' — 관심 단지마다 한 행으로 명시한다(예시 ID).
+# 미등재 단지는 lookup 시 NoMatchingRow → 응용계층이 '데이터 없음(확인 필요)'로 처리.
+# (규제 결론을 임의 기본값으로 단정하지 않는다 — 안전측 동작)
+2025.10,2025-10-15,GANGNAM-DAECHI-001,true
+2025.10,2025-10-15,SONGPA-JAMSIL-001,true
+2025.10,2025-10-15,YONGSAN-ICHON-001,true
+2025.10,2025-10-15,NOWON-SANGGYE-001,false

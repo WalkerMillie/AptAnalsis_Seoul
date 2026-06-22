@@ -1,0 +1,13 @@
+# [GENERATED] 방어선 C — 경계 가드 (DESIGN §3.4)
+[[rule]]
+name = "watchlist.domain은 adapters/application 의존 금지"
+forbidden = "contexts.watchlist.domain -> contexts.watchlist.adapters | contexts.watchlist.application"
+[[rule]]
+name = "region.domain은 adapters/application 의존 금지"
+forbidden = "contexts.region.domain -> contexts.region.adapters | contexts.region.application"
+[[rule]]
+name = "market_data.domain은 adapters/application 의존 금지"
+forbidden = "contexts.market_data.domain -> contexts.market_data.adapters | contexts.market_data.application"
+[[rule]]
+name = "analysis.domain은 adapters/application 의존 금지"
+forbidden = "contexts.analysis.domain -> contexts.analysis.adapters | contexts.analysis.application"

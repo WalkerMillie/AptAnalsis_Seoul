@@ -1,0 +1,126 @@
+version: '2026-06-20'
+infrastructure:
+  database: PostgreSQL
+  messaging: Redis
+  task_queue: Celery
+  web: drf
+contexts:
+- name: watchlist
+  domains:
+    WatchlistItem:
+      kind: aggregate
+      states:
+      - WATCHING
+      - GATE_LOCKED
+      transitions:
+        WATCHING:
+        - GATE_LOCKED
+        GATE_LOCKED:
+        - WATCHING
+      guards:
+      - edge: WATCHING->GATE_LOCKED
+        id: WL-G01
+        desc: 'listing_count == 0: 매물 없음 → 잠김 경고, 깊은 분석 보류'
+      - edge: GATE_LOCKED->WATCHING
+        id: WL-G02
+        desc: 'listing_count >= 1: 매물 복귀 → 잠김 해제'
+      invariants:
+      - id: WL-INV01
+        desc: 동일 (user, complex) 조합의 WatchlistItem은 최대 1개
+  relations:
+  - to: market_data
+    via: event
+    event: ListingSnapshotRecorded
+  - to: analysis
+    via: call
+- name: region
+  domains:
+    Region:
+      kind: reference
+    Complex:
+      kind: reference
+- name: market_data
+  domains:
+    CollectionJob:
+      kind: aggregate
+      states:
+      - PENDING
+      - RUNNING
+      - DONE
+      - FAILED
+      transitions:
+        PENDING:
+        - RUNNING
+        RUNNING:
+        - DONE
+        - FAILED
+        FAILED:
+        - PENDING
+      guards:
+      - edge: RUNNING->FAILED
+        id: CD-G01
+        desc: 외부 API 오류·쿼터 초과·타임아웃 발생 시 실패 전이
+      invariants:
+      - id: CD-INV01
+        desc: 동일 (job_type, target_date)에 RUNNING 상태 잡은 최대 1개 (idempotent 수집)
+      ports_out:
+      - fetch_molit_trades
+      - fetch_ecos_rates
+      - fetch_listing_snapshot
+    Trade:
+      kind: reference
+    Rate:
+      kind: reference
+    ListingSnapshot:
+      kind: reference
+  relations:
+  - to: region
+    via: call
+- name: analysis
+  domains:
+    BreakevenCalc:
+      kind: calculation
+      formulas:
+      - id: AN-F01
+        name: 손익분기 상승률 = 대출비중 × 실효금리
+    LeverageROE:
+      kind: calculation
+      formulas:
+      - id: AN-F02
+        name: 순익 = 매매가 × 가정상승률 − 대출액 × 실효금리
+      - id: AN-F03
+        name: ROE = 순익 / 자기자본
+    StressDSR:
+      kind: calculation
+      formulas:
+      - id: AN-F04
+        name: 스트레스 금리 = 실효금리 + 3.0%p (DSR 3.0 스트레스 버퍼 가산)
+  decision_tables:
+  - name: 가격대별 대출 한도
+    kind: range
+    inputs:
+    - purchase_price
+    output: max_loan_amount
+    versioned: true
+    id: AN-DT01
+  - name: 토지거래허가구역 여부
+    kind: flag
+    inputs:
+    - complex_id
+    output: ltz_applies
+    versioned: true
+    id: AN-DT02
+  - name: 양도세 비과세 충족 여부
+    kind: flag
+    inputs:
+    - holding_years
+    - residency_years
+    - house_count
+    output: capital_gains_tax_exempt
+    versioned: true
+    id: AN-DT03
+  relations:
+  - to: market_data
+    via: call
+  - to: region
+    via: call
