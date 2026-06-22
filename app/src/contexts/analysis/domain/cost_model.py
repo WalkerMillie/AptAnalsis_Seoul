@@ -3,75 +3,69 @@
 기존 손익분기(an_f01)는 '이자만' 메우는 약한 모델이었다. 여기서는 실제 의사결정에 필요한
 거래·보유·청산 비용을 모두 반영한 '총비용 손익분기'와 순익/ROE를 계산한다.
 
-반영 비용: 취득세(+교육세 근사) · 매수/매도 중개보수 · 보유세(근사) · 대출이자 · 양도소득세
-           · 자기자본 기회비용.  금액=원, 비율=소수.
+반영 비용: 취득세(+교육세 근사, 다주택 중과) · 매수/매도 중개보수 · 보유세(근사) · 대출이자
+           · 양도소득세(1세대1주택 12억 초과분 안분 과세 + 보유/거주 장특공) · 자기자본 기회비용.
+금액=원, 비율=소수.
 
-정책값(세율·요율)은 2026 기준 법정 구간을 아래 상수로 둔다(자주 바뀜 → 추후 결정표로 분리 가능,
-AN-F04 스트레스버퍼가 도메인 상수인 것과 같은 처리). 보유세/양도세는 명시한 근사이며,
-정밀 산식(공시가·종부세 공제·장특공 세분)은 후속 정밀화 대상.
+정책값(세율·요율)은 tax_policy.py 결정표에 단일 출처로 분리했다(법 개정 시 거기만 수정).
+거주연수는 별도 입력이 없어 1주택은 실거주(거주연수=보유연수)로 근사한다 — 명시한 근사.
 """
 
 from __future__ import annotations
 
-_EOK = 100_000_000.0   # 1억(원)
+from contexts.analysis.domain import tax_policy as T
 
-# ── 취득세: 주택 1주택 기준. 6억↓ 1%, 6~9억 1→3% 선형, 9억↑ 3%. (+지방교육세 ≈ ×1.1) ──
-def acquisition_tax_rate(price: float) -> float:
-    """실효 취득세율(소수, 지방교육세 포함 근사). 농특세(전용85㎡초과 0.2%)는 면적 미입력이라 제외."""
+_EOK = T.EOK
+
+
+# ── 취득세 ──
+def acquisition_tax_rate(price: float, *, is_first_home: bool = True) -> float:
+    """실효 취득세율(소수). 1주택은 6억↓1%/6~9억 선형/9억↑3% (+지방교육세 ×1.1).
+
+    다주택(is_first_home=False)은 중과 근사율을 그대로 쓴다. 농특세(전용85㎡초과)는 면적
+    미입력이라 제외.
+    """
+    if not is_first_home:
+        return T.ACQ_MULTI_HOME
     eok = price / _EOK
-    if eok <= 6:
-        base = 0.01
-    elif eok <= 9:
-        base = 0.01 + (eok - 6) * (0.02 / 3)   # 6억 1% → 9억 3% 선형
+    if eok <= T.ACQ_1HOME_LOW_EOK:
+        base = T.ACQ_1HOME_LOW
+    elif eok <= T.ACQ_1HOME_HIGH_EOK:
+        span = T.ACQ_1HOME_HIGH_EOK - T.ACQ_1HOME_LOW_EOK
+        base = T.ACQ_1HOME_LOW + (eok - T.ACQ_1HOME_LOW_EOK) * (
+            (T.ACQ_1HOME_HIGH - T.ACQ_1HOME_LOW) / span)
     else:
-        base = 0.03
-    return base * 1.1                          # 지방교육세 근사 가산
+        base = T.ACQ_1HOME_HIGH
+    return base * T.ACQ_EDU_SURTAX
 
 
-# ── 중개보수 상한요율(매매, 서울 2021 개편): 구간별 ──
+# ── 중개보수 ──
 def brokerage_rate(price: float) -> float:
+    """매매 중개보수 상한요율(소수). 구간표 첫 매칭."""
     eok = price / _EOK
-    if eok < 0.5:
-        return 0.006
-    if eok < 2:
-        return 0.005
-    if eok < 9:
-        return 0.004
-    if eok < 12:
-        return 0.005
-    if eok < 15:
-        return 0.006
-    return 0.007
+    for upper, rate in T.BROKERAGE_TABLE:
+        if eok < upper:
+            return rate
+    return T.BROKERAGE_TABLE[-1][1]
 
 
-# ── 보유세(재산세+종부세) 연간, 매매가 대비 근사율. 1주택 기준 대략값. ──
+# ── 보유세 ──
 def annual_holding_tax(price: float) -> float:
+    """연간 보유세(원) 근사 = 매매가 × 구간 실효율."""
     eok = price / _EOK
-    if eok <= 9:
-        rate = 0.001
-    elif eok <= 15:
-        rate = 0.0025
-    elif eok <= 25:
-        rate = 0.005
-    else:
-        rate = 0.008
-    return price * rate
+    for upper, rate in T.HOLDING_TAX_TABLE:
+        if eok <= upper:
+            return price * rate
+    return price * T.HOLDING_TAX_TABLE[-1][1]
 
 
-# ── 양도소득세(근사): 1주택 비과세 토글 + 일반 장기보유특별공제 + 기본세율 누진(+지방소득세 10%) ──
-_CGT_BRACKETS = [   # (과세표준 상한(원), 한계세율)
-    (14_000_000, 0.06), (50_000_000, 0.15), (88_000_000, 0.24),
-    (150_000_000, 0.35), (300_000_000, 0.38), (500_000_000, 0.40),
-    (1_000_000_000, 0.42), (float("inf"), 0.45),
-]
-
-
+# ── 양도소득세 ──
 def _progressive_cgt(base: float) -> float:
     """과세표준 → 누진 산출세액(지방소득세 제외)."""
     if base <= 0:
         return 0.0
     tax, lo = 0.0, 0.0
-    for hi, rate in _CGT_BRACKETS:
+    for hi, rate in T.CGT_BRACKETS:
         if base > hi:
             tax += (hi - lo) * rate
             lo = hi
@@ -81,21 +75,47 @@ def _progressive_cgt(base: float) -> float:
     return tax
 
 
-def capital_gains_tax(gain: float, holding_years: float, *, first_home_exempt: bool) -> float:
-    """양도소득세 근사(원). first_home_exempt면 0(1주택 2년+·12억↓는 호출측에서 판정).
+def taxable_fraction(sale_price: float, holding_years: float, *, is_first_home: bool) -> float:
+    """과세 대상 양도차익 비율(소수).
 
-    일반 장기보유특별공제: 보유 3년부터 연 2%, 최대 30%. 기본공제 연 250만.
+    1세대1주택(보유 2년+): 12억 이하 전액 비과세(0), 12억 초과 시 (양도가−12억)/양도가 안분.
+    그 외(다주택·단기보유): 전액 과세(1.0).  → 12억 경계에서 연속(절벽 제거).
     """
-    if first_home_exempt or gain <= 0:
+    if is_first_home and holding_years >= T.ONE_HOME_MIN_HOLD:
+        if sale_price <= T.HIGH_PRICE_THRESHOLD:
+            return 0.0
+        return (sale_price - T.HIGH_PRICE_THRESHOLD) / sale_price
+    return 1.0
+
+
+def _ltd_rate(holding_years: float, *, is_first_home: bool) -> float:
+    """장기보유특별공제율(소수). 1주택=보유+거주(거주=보유 근사) 우대, 그 외=일반."""
+    if holding_years < T.LTD_MIN_HOLD:
         return 0.0
-    ltd = min(0.30, holding_years * 0.02) if holding_years >= 3 else 0.0
-    base = gain * (1 - ltd) - 2_500_000
-    return _progressive_cgt(base) * 1.1        # 지방소득세 10% 가산
+    if is_first_home:
+        per_dim = min(T.LTD_1HOME_MAX_EACH, holding_years * T.LTD_1HOME_PER_YEAR)
+        return min(T.LTD_1HOME_MAX_TOTAL, per_dim * 2)   # 보유분 + 거주분
+    return min(T.LTD_GENERAL_MAX, holding_years * T.LTD_GENERAL_PER_YEAR)
 
 
-def _first_home_exempt(is_first_home: bool, sale_price: float, holding_years: float) -> bool:
-    """1주택 비과세 요건 근사: 1주택 & 보유 2년+ & 양도가 12억 이하."""
-    return bool(is_first_home and holding_years >= 2 and sale_price <= 12 * _EOK)
+def capital_gains_tax(gain: float, sale_price: float, holding_years: float,
+                      *, is_first_home: bool) -> float:
+    """양도소득세 근사(원). 12억 초과분 안분 과세 + 장특공 + 기본공제 + 지방소득세."""
+    if gain <= 0:
+        return 0.0
+    frac = taxable_fraction(sale_price, holding_years, is_first_home=is_first_home)
+    if frac <= 0:
+        return 0.0
+    taxable_gain = gain * frac
+    ltd = _ltd_rate(holding_years, is_first_home=is_first_home)
+    base = taxable_gain * (1 - ltd) - T.CGT_BASIC_DEDUCTION
+    return _progressive_cgt(base) * T.CGT_LOCAL_SURTAX
+
+
+def _fully_exempt(sale_price: float, holding_years: float, *, is_first_home: bool) -> bool:
+    """1세대1주택 '전액' 비과세 여부(12억 이하·2년+) — 표시용 플래그."""
+    return bool(is_first_home and holding_years >= T.ONE_HOME_MIN_HOLD
+                and sale_price <= T.HIGH_PRICE_THRESHOLD)
 
 
 def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float,
@@ -107,13 +127,12 @@ def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float
     ROE 분모 = 투입 자기자본(equity + 취득부대비용).
     """
     P, L, H = purchase_price, loan_amount, holding_years
-    buy_tax = P * acquisition_tax_rate(P)
+    buy_tax = P * acquisition_tax_rate(P, is_first_home=is_first_home)
     buy_fee = P * brokerage_rate(P)
     sale = P * (1 + growth) ** H
     gain = sale - P
     sell_fee = sale * brokerage_rate(sale)
-    exempt = _first_home_exempt(is_first_home, sale, H)
-    cgt = capital_gains_tax(gain, H, first_home_exempt=exempt)
+    cgt = capital_gains_tax(gain, sale, H, is_first_home=is_first_home)
     interest = L * effective_rate * H
     holding_tax = annual_holding_tax(P) * H
     invested = equity + buy_tax + buy_fee
@@ -125,7 +144,7 @@ def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float
         "capital_gain": gain,
         "invested_equity": invested,
         "roe": net / invested if invested > 0 else 0.0,
-        "first_home_exempt": exempt,
+        "first_home_exempt": _fully_exempt(sale, H, is_first_home=is_first_home),
         "costs": {
             "acquisition_tax": buy_tax,
             "buy_brokerage": buy_fee,
@@ -143,7 +162,8 @@ def breakeven_growth(*, purchase_price: float, loan_amount: float, equity: float
                      opportunity_rate: float, is_first_home: bool) -> float:
     """순익=0 이 되는 연상승률(소수)을 이분탐색. 순익은 growth에 단조증가.
 
-    이 값을 넘는 연상승률이면 모든 비용을 메우고 남는다(=진짜 손익분기).
+    양도세 12억 안분이 연속이므로(절벽 제거) 순익은 growth에 대해 단조증가가 유지된다 —
+    이분탐색의 전제. 이 값을 넘는 연상승률이면 모든 비용을 메우고 남는다(=진짜 손익분기).
     """
     def net(g: float) -> float:
         return total_net_profit(
