@@ -42,7 +42,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        # 기본은 기존과 동일(BASE_DIR/db.sqlite3). DB_PATH 환경변수로 덮어쓰면
+        # 컨테이너에서 마운트 볼륨(/data 등)에 DB를 둬 재기동 간 영속 가능.
+        "NAME": os.environ.get("DB_PATH") or (BASE_DIR / "db.sqlite3"),
         # 수집(쓰기)과 조회/기동(읽기)이 겹칠 때 'database is locked'로 죽지 않고 대기.
         # SQLite 동시성 한계 완화용. 운영 PostgreSQL 전환 시 불필요.
         "OPTIONS": {"timeout": 30},

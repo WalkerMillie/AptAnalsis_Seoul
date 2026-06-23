@@ -1,0 +1,9 @@
+.git
+.venv
+**/__pycache__
+*.pyc
+# 로컬 DB는 이미지에 넣지 않음 — 컨테이너가 볼륨에서 새로 시딩.
+**/db.sqlite3
+**/db.sqlite3-wal
+**/db.sqlite3-shm
+docs
