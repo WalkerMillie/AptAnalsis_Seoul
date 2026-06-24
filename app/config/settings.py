@@ -20,8 +20,10 @@ if _env_file.exists():
             _k, _v = _line.split("=", 1)
             os.environ.setdefault(_k.strip(), _v.strip())
 
-SECRET_KEY = "dev-insecure-change-me"
-DEBUG = True
+# prod(K8s)에선 SECRET_KEY/DEBUG를 env로 덮어쓴다. 미지정 시 기존 로컬 동작 유지.
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
+DEBUG = os.environ.get("DEBUG", "1") == "1"
+# CF Tunnel/Access 뒤에서만 노출 — 호스트 검증은 게이트웨이에 위임.
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [

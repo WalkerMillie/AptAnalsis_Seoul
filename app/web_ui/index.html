@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>찬혁 & 민지의 내집찾아 삼만리</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzExMTYxZiIvPjxyZWN0IHg9IjUiIHk9IjE3IiB3aWR0aD0iNS41IiBoZWlnaHQ9IjkiIHJ4PSIxLjIiIGZpbGw9IiNmZmIwMDAiLz48cmVjdCB4PSIxMy4yNSIgeT0iMTIiIHdpZHRoPSI1LjUiIGhlaWdodD0iMTQiIHJ4PSIxLjIiIGZpbGw9IiNmZmIwMDAiLz48cmVjdCB4PSIyMS41IiB5PSI3IiB3aWR0aD0iNS41IiBoZWlnaHQ9IjE5IiByeD0iMS4yIiBmaWxsPSIjZmZiMDAwIi8+PHBhdGggZD0iTTYgMTQgTDE2IDkgTDI2IDQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzIyZDNlZSIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iNCIgcj0iMi40IiBmaWxsPSIjMjJkM2VlIi8+PC9zdmc+Cg==">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>
   :root{
     --bg:#0b0e14; --bg-2:#0f131c; --panel:#11161f; --panel-2:#141a25;
@@ -18,7 +20,7 @@
     --topbar-a:#0e1320; --topbar-b:#0a0d14;
     --on-amber-txt:var(--bg);   /* amber 강조 버튼 위 글자색 */
     --mono:'JetBrains Mono','IBM Plex Mono',monospace;
-    --sans:'IBM Plex Sans KR',sans-serif;
+    --sans:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
     /* 기존 JS(lineChart/conf/pos·neg)와 호환되는 별칭 */
     --muted:var(--txt-dim); --good:var(--up); --bad:var(--down);
     --good-soft:rgba(38,208,124,.16); --bad-soft:rgba(255,93,93,.16);
@@ -392,7 +394,7 @@
       <div class="sel-group">
         <div class="sel-label">③ 단지 · 기간</div>
         <div class="seg" id="monthsSeg" style="margin-bottom:8px">
-          <button data-m="6">6M</button><button data-m="12" class="on">12M</button><button data-m="24">24M</button><button data-m="36">36M</button>
+          <button data-m="12">1년</button><button data-m="24" class="on">2년</button><button data-m="36">3년</button><button data-m="60">5년</button><button data-m="120">10년</button>
         </div>
         <div id="cxLegend" class="note" style="margin-bottom:6px"></div>
         <div id="complexes" class="clist" style="max-height:380px"><div class="empty">동을 먼저 고르세요</div></div>
@@ -465,7 +467,7 @@
     <div class="phead"><span class="acc"></span>서울 어디가 오르나 <span class="r">CHOROPLETH · RANKING</span></div>
     <div style="padding:12px; display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap">
       <div><label>기간</label>
-        <div class="seg" id="rkMonthsSeg"><button data-m="6">6M</button><button data-m="12" class="on">12M</button><button data-m="24">24M</button><button data-m="36">36M</button></div></div>
+        <div class="seg" id="rkMonthsSeg"><button data-m="12">1년</button><button data-m="24" class="on">2년</button><button data-m="36">3년</button><button data-m="60">5년</button><button data-m="120">10년</button></div></div>
       <div><label><span class="tip" data-tip="거래가 적은 단지는 우연히 튄 한두 건에 좌우돼요. 최소 거래수를 높이면 더 믿을 만한 단지만 봅니다.">최소 거래수</span></label>
         <select id="rkMin" style="width:auto"><option>5</option><option selected>10</option><option>20</option><option>30</option></select></div>
       <div><label>보기</label>
@@ -507,7 +509,7 @@
         <label style="margin-top:12px">평형대 (평) · 빈칸=제한없음</label>
         <div class="searchrow"><input id="fAreaMin" type="number" placeholder="최소"><input id="fAreaMax" type="number" placeholder="최대"></div>
         <label style="margin-top:12px">분석 기간</label>
-        <div class="seg" id="recoMonthsSeg"><button data-m="6">6M</button><button data-m="12" class="on">12M</button><button data-m="24">24M</button><button data-m="36">36M</button></div>
+        <div class="seg" id="recoMonthsSeg"><button data-m="12">1년</button><button data-m="24" class="on">2년</button><button data-m="36">3년</button><button data-m="60">5년</button><button data-m="120">10년</button></div>
       </div>
       <div class="phead" style="border-top:1px solid var(--line)"><span class="acc" style="background:var(--cyan)"></span>초점 프리셋 <span class="r">ONE-TAP</span></div>
       <div style="padding:2px 12px 0">
@@ -632,7 +634,7 @@ $('searchBtn').onclick=runSearch;
 $('dongSearch').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });
 
 // ===== STEP 2 =====
-let curRegion=null, curDong=null, listMonths=12, _complexList=[];
+let curRegion=null, curDong=null, listMonths=24, _complexList=[];
 async function openDong(code, dong, autoCid){
   showView('analyze', false);     // 지도·추천에서 진입 시 분석 뷰로 전환
   curRegion=code; curDong=dong;
@@ -678,11 +680,11 @@ async function selectComplex(c, el){
   if(el) el.classList.add('active');
   curComplex=c;
   const [series, growth, trades, jeonse, jeonseSeries, regsum] = await busy('이 단지 분석 중…', ()=>Promise.all([
-    jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
+    jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
-    jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
+    jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     getRegsum(),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
@@ -922,7 +924,7 @@ function renderAnalysis(d, body){
 }
 
 // ===== STEP 4: 랭킹 =====
-let rkMonths=12;
+let rkMonths=24;
 async function runRanking(){
   const min=+$('rkMin').value;
   const r=await busy('서울 전체 단지 줄세우는 중…',
@@ -1050,7 +1052,7 @@ const RECO_PRESETS = [
   {name:'대형 가성비', tip:'같은 돈에 더 넓은 집 · 노원·강서·중랑 밀집',
    w:{price_ppm2:8, area_m2:9, build_year:0, growth:2, jeonse_ratio:0, confidence:2}},
 ];
-let _candidates=[], recoMonths=12;
+let _candidates=[], recoMonths=24;
 
 function buildWeightSliders(){
   $('weights').innerHTML = RECO_METRICS.map(m=>`
@@ -1198,8 +1200,8 @@ $('themeToggle').onclick=()=>applyTheme(
 async function buildTicker(){
   try{
     const [rk, rs] = await Promise.all([
-      jget('/api/market_data/rankings/?months=12&min_trades=10&limit=15'),
-      jget('/api/market_data/region_summary/?months=12&min_trades=10'),
+      jget('/api/market_data/rankings/?months=24&min_trades=10&limit=15'),
+      jget('/api/market_data/region_summary/?months=24&min_trades=10'),
     ]);
     const movers=(rk.ranked||[]).slice(0,15).map(c=>
       `<span class="tk"><b>${c.apt_name}</b> <span class="${c.growth>=0?'up':'down'}">${c.growth>=0?'▲ +':'▼ -'}${pct(Math.abs(c.growth))}</span></span>`);
