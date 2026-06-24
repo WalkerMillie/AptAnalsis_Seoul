@@ -120,6 +120,18 @@ class JeonseRatioView(APIView):
         return Response(get_trade_query().jeonse_ratio(complex_id, _months(request)))
 
 
+class CandidateMetricsView(APIView):
+    """GET /api/market_data/candidates/?months=12&min_trades=10 — 전 단지 다지표(가중치 랭킹용)."""
+
+    def get(self, request):
+        try:
+            mt = int(request.query_params.get("min_trades", 10))
+        except (TypeError, ValueError):
+            mt = 10
+        return Response(get_trade_query().candidate_metrics(
+            _months(request), max(1, min(1000, mt))))
+
+
 class JeonseSeriesView(APIView):
     """GET /api/market_data/jeonse_series/?complex_id=..&months=12 — 월별 전세 ㎡당 보증금 추세."""
 

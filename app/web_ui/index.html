@@ -253,6 +253,25 @@
     </div>
   </section>
 
+  <!-- STEP 5: 맞춤 추천 (가중치 랭킹) -->
+  <section class="card">
+    <div class="step"><div class="num">◎</div><h2>내 우선순위로 단지 찾기</h2>
+      <span class="hint">중요한 지표의 막대를 올리면 그 기준으로 단지를 줄세웁니다</span></div>
+
+    <div class="row" style="gap:18px; margin-bottom:6px">
+      <div class="grow"><label>가격대 (억) · 빈칸=제한없음</label>
+        <div class="searchrow"><input id="fPriceMin" type="number" step="0.5" placeholder="최소"><input id="fPriceMax" type="number" step="0.5" placeholder="최대"></div></div>
+      <div class="grow"><label>평형대 (㎡) · 빈칸=제한없음</label>
+        <div class="searchrow"><input id="fAreaMin" type="number" placeholder="최소"><input id="fAreaMax" type="number" placeholder="최대"></div></div>
+      <div><label>기간</label>
+        <div class="seg" id="recoMonthsSeg"><button data-m="6">6개월</button><button data-m="12" class="on">12개월</button></div></div>
+    </div>
+
+    <div id="weights" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px 18px; margin:10px 0 4px"></div>
+    <div class="note" id="recoLegend"></div>
+    <div id="recoList" class="clist" style="max-height:560px"></div>
+  </section>
+
   <p class="note" style="text-align:center; margin-top:24px">
     실거래가는 국토부 공개 데이터 기준이며, 세금·비용은 2026 기준 근사치입니다. 투자 판단의 참고 자료입니다.
   </p>
@@ -346,12 +365,17 @@ $('searchBtn').onclick=runSearch;
 $('dongSearch').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });
 
 // ===== STEP 2 =====
-let curRegion=null, curDong=null, listMonths=12;
-async function openDong(code, dong){
+let curRegion=null, curDong=null, listMonths=12, _complexList=[];
+async function openDong(code, dong, autoCid){
   curRegion=code; curDong=dong;
   $('district').value=code; await loadDongs(code); $('dong').value=dong;
   await loadComplexes();
   $('step2').classList.remove('hidden');
+  // 추천 리스트에서 특정 단지로 진입 시 자동 선택 + 분석.
+  if(autoCid){
+    const c=_complexList.find(x=>x.complex_id===autoCid);
+    if(c){ await selectComplex(c, null); return; }
+  }
   $('step2').scrollIntoView({behavior:'smooth', block:'start'});
 }
 async function loadComplexes(){
@@ -361,7 +385,7 @@ async function loadComplexes(){
   const r=await busy('단지 상승률 계산 중…',
     ()=>jget(`/api/market_data/complex_scores/?region_code=${curRegion}&dong=${encodeURIComponent(curDong)}&months=${listMonths}`),
     `${curDong} · 최근 ${listMonths}개월`);
-  const list=r.complexes||[];
+  const list=r.complexes||[]; _complexList=list;
   $('cxLegend').innerHTML = `오른 정도 = 같은 평형 실거래 ㎡가 기준, 최근 ${listMonths}개월. 거래가 적은 단지는 “데이터 부족”으로 표시돼요.`;
   $('complexes').innerHTML='';
   if(!list.length){ $('complexes').innerHTML='<div class="empty">표시할 단지가 없어요.</div>'; return; }
@@ -625,7 +649,98 @@ async function loadDataInfo(){
   $('dataInfo').textContent = '국토부 실거래 기반 · 서울 25개 구 · 최근 12개월';
 }
 
-(async()=>{ await loadDistricts(); loadDataInfo(); renderMap(); })();
+// ===== STEP 5: 맞춤 추천 (가중치 랭킹) =====
+// 지표 정의: key=API필드, dir=+1(높을수록 좋음)/-1(낮을수록 좋음), w=기본 가중치.
+const RECO_METRICS = [
+  {key:'price_ppm2', label:'가성비 (㎡당가 낮을수록)', dir:-1, w:5},
+  {key:'area_m2',    label:'넓이 (클수록)',          dir:+1, w:2},
+  {key:'build_year', label:'신축 (최근일수록)',       dir:+1, w:3},
+  {key:'growth',     label:'상승세 (높을수록)',        dir:+1, w:3},
+  {key:'jeonse_ratio',label:'전세 안전 (전세가율↑)',   dir:+1, w:4},
+  {key:'confidence', label:'데이터 신뢰 (높을수록)',    dir:+1, w:2},
+];
+let _candidates=[], recoMonths=12;
+
+function buildWeightSliders(){
+  $('weights').innerHTML = RECO_METRICS.map(m=>`
+    <div>
+      <label style="display:flex; justify-content:space-between">
+        <span>${m.label}</span><span class="muted" id="wv_${m.key}">${m.w}</span></label>
+      <input type="range" min="0" max="10" value="${m.w}" id="w_${m.key}" style="width:100%">
+    </div>`).join('');
+  RECO_METRICS.forEach(m=>{
+    const s=$('w_'+m.key);
+    s.addEventListener('input',()=>{ $('wv_'+m.key).textContent=s.value; renderReco(); });
+  });
+}
+
+async function loadCandidates(){
+  const r=await busy('단지 지표 모으는 중…',
+    ()=>jget(`/api/market_data/candidates/?months=${recoMonths}&min_trades=10`),
+    `최근 ${recoMonths}개월 · 전 단지`);
+  _candidates=r.candidates||[];
+  renderReco();
+}
+
+// 후보군 내 백분위(0~1)로 정규화 — 이상치에 강건. dir 반영(낮을수록 좋으면 1-pctile).
+function percentiles(rows, key){
+  const vals=rows.map(r=>r[key]).filter(v=>v!=null).sort((a,b)=>a-b);
+  if(vals.length<2) return null;
+  return v=>{
+    if(v==null) return 0.5;          // 결측(전세가율 등) = 중립
+    let lo=0,hi=vals.length; while(lo<hi){ const m=(lo+hi)>>1; if(vals[m]<v) lo=m+1; else hi=m; }
+    return lo/(vals.length-1>0?vals.length-1:1);
+  };
+}
+
+function renderReco(){
+  if(!_candidates.length){ $('recoList').innerHTML='<div class="empty">후보 단지가 없어요. 기간을 바꿔보세요.</div>'; return; }
+  const pMin=parseFloat($('fPriceMin').value), pMax=parseFloat($('fPriceMax').value);
+  const aMin=parseFloat($('fAreaMin').value), aMax=parseFloat($('fAreaMax').value);
+  let rows=_candidates.filter(c=>{
+    const eok=c.total_price/1e8;
+    if(!isNaN(pMin)&&eok<pMin) return false;
+    if(!isNaN(pMax)&&eok>pMax) return false;
+    if(!isNaN(aMin)&&c.area_m2<aMin) return false;
+    if(!isNaN(aMax)&&c.area_m2>aMax) return false;
+    return true;
+  });
+  const weights=RECO_METRICS.map(m=>({...m, w:+$('w_'+m.key).value}));
+  const wsum=weights.reduce((s,m)=>s+m.w,0) || 1;
+  // 필터된 집합 기준 백분위 함수(지표별)
+  const pf={}; weights.forEach(m=>pf[m.key]=percentiles(rows,m.key));
+  rows.forEach(c=>{
+    let sc=0;
+    weights.forEach(m=>{
+      if(!m.w||!pf[m.key]) return;
+      let p=pf[m.key](c[m.key]);          // 0~1 (높을수록 큼)
+      if(m.dir<0) p=1-p;                   // 낮을수록 좋은 지표
+      sc += m.w*p;
+    });
+    c._score=100*sc/wsum;
+  });
+  rows.sort((a,b)=>b._score-a._score);
+  $('recoLegend').innerHTML=`조건 통과 ${rows.length}곳 · 점수 = 막대 가중치로 정규화 합산(후보군 내 상대 순위). 단지를 누르면 그 단지 분석으로 이동합니다.`;
+  $('recoList').innerHTML='';
+  rows.slice(0,80).forEach((c,i)=>{
+    const el=document.createElement('div'); el.className='citem';
+    const jr = c.jeonse_ratio!=null? `전세가율 ${pct(c.jeonse_ratio)}` : '전세 표본부족';
+    const gtxt = `<span class="${c.growth>=0?'pos':'neg'}">${c.growth>=0?'▲':'▼'}${pct(Math.abs(c.growth))}</span>`;
+    el.innerHTML=`<div class="rank">${i+1}</div>
+      <div><div class="nm">${c.apt_name} <span class="muted" style="font-weight:400">${c.area_m2}㎡</span></div>
+        <div class="meta">${districtName[c.region_code]||''} ${c.dong} · ${won(c.total_price)} · 🏗${c.build_year||'-'} · 12M ${gtxt} · ${jr}</div></div>
+      <div class="grow"><div class="g" style="color:var(--accent)">${Math.round(c._score)}</div><div class="meta">점</div></div>`;
+    el.onclick=()=>openDong(c.region_code, c.dong, c.complex_id);
+    $('recoList').appendChild(el);
+  });
+}
+['fPriceMin','fPriceMax','fAreaMin','fAreaMax'].forEach(id=>$(id).addEventListener('input',renderReco));
+$('recoMonthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  $('recoMonthsSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); recoMonths=+b.dataset.m; loadCandidates();
+});
+
+(async()=>{ await loadDistricts(); loadDataInfo(); renderMap(); buildWeightSliders(); loadCandidates(); })();
 </script>
 </body>
 </html>

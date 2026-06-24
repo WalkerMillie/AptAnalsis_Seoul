@@ -303,6 +303,74 @@ class TradeQueryService:
                   for i, v in sorted(by_month.items())]
         return {"complex_id": complex_id, "months": months, "band_m2": band, "series": series}
 
+    def candidate_metrics(self, months: int = 12, min_trades: int = 10,
+                          limit: int = 2000) -> dict:
+        """서울 전 단지의 다지표(가격·평수·건축년도·상승률·전세가율·신뢰도)를 1회 순회로 집계.
+
+        가중치 랭킹(후보 추천)용 raw 지표 — 정규화·가중합·정렬은 프론트에서(슬라이더 즉시 반영).
+        같은 윈도우(공통 anchor·최근 months개월) + 표본 게이트(min_trades·_growth_from_points) 통과만.
+        매매·전세 각각 한 번씩만 순회(O(N)) — 단지별로 모아 처리.
+        """
+        sales = self._store.rows("trades")
+        rents = self._store.rows("rents")
+        anchor = self._anchor_idx(sales)
+        if anchor is None:
+            return {"months": months, "min_trades": min_trades, "candidates": []}
+        start = anchor - (months - 1)
+        # 매매: 단지별 윈도우 거래점 + 건축년도
+        S: dict = {}
+        for t in sales:
+            if t.area_m2 <= 0:
+                continue
+            idx = _month_idx(t.contract_date)
+            if not (start <= idx <= anchor):
+                continue
+            e = S.setdefault(t.complex_id, {
+                "name": t.apt_name, "region": t.region_code, "dong": t.legal_dong,
+                "points": [], "byears": []})
+            e["points"].append((idx, t.area_m2, t.price / t.area_m2))
+            if t.build_year:
+                e["byears"].append(t.build_year)
+        # 전세: 단지별 평형밴드 → ㎡당 보증금
+        R: dict = {}
+        for r in rents:
+            if r.area_m2 <= 0:
+                continue
+            idx = _month_idx(r.contract_date)
+            if not (start <= idx <= anchor):
+                continue
+            R.setdefault(r.complex_id, {}).setdefault(_band(r.area_m2), []).append(
+                r.deposit / r.area_m2)
+        out = []
+        for cid, e in S.items():
+            pts = e["points"]
+            if len(pts) < min_trades:
+                continue
+            g = _growth_from_points(pts)
+            if g is None:
+                continue
+            # 대표 평형 = 윈도우 거래 최빈 밴드
+            band = Counter(_band(a) for _, a, _ in pts).most_common(1)[0][0]
+            sale_ppm2 = median([p for _, a, p in pts if _band(a) == band])
+            # 전세가율(대표 평형의 매매·전세 각 _MIN_RATIO_SEG건+)
+            jr = None
+            rb = R.get(cid, {}).get(band)
+            sale_seg = [p for _, a, p in pts if _band(a) == band]
+            if rb and len(rb) >= _MIN_RATIO_SEG and len(sale_seg) >= _MIN_RATIO_SEG:
+                jr = round(median(rb) / sale_ppm2, 4)
+            build_year = Counter(e["byears"]).most_common(1)[0][0] if e["byears"] else 0
+            out.append({
+                "complex_id": cid, "apt_name": e["name"],
+                "region_code": e["region"], "dong": e["dong"],
+                "price_ppm2": round(sale_ppm2),
+                "total_price": round(sale_ppm2 * band),
+                "area_m2": band, "build_year": build_year,
+                "growth": g["growth"], "jeonse_ratio": jr,
+                "confidence": g["confidence"], "window_trades": len(pts),
+            })
+        return {"months": months, "min_trades": min_trades,
+                "total": len(out), "candidates": out[:limit]}
+
     def region_summary(self, months: int = 12, min_trades: int = 10) -> dict:
         """구(region_code)별 단지 상승률 중앙값 — 지도 색칠(choropleth)용.
 
