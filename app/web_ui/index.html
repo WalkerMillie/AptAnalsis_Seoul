@@ -381,17 +381,18 @@ $('monthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 });
 
 // ===== STEP 3 =====
-let curComplex=null, curGrowth=null;
+let curComplex=null, curGrowth=null, curJeonse=null;
 async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
-  const [series, growth, trades] = await busy('이 단지 분석 중…', ()=>Promise.all([
+  const [series, growth, trades, jeonse] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
+    jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
   ]), c.apt_name);
-  curGrowth=growth;
+  curGrowth=growth; curJeonse=jeonse;
   $('step3').classList.remove('hidden');
   $('cxTitle').textContent = `${c.apt_name} — 지금 사면?`;
   const latest = (trades.trades||[])[0];
@@ -417,10 +418,34 @@ async function runAnalyze(){
     equity:+$('equity').value, effective_rate:+$('effective_rate').value,
     assumed_growth:+$('assumed_growth').value, holding_years:+$('holding_years').value,
     opportunity_rate:+$('opportunity_rate').value, is_first_home:$('is_first_home').checked,
+    // 자택 거주가치 반영 — 단지 실측 전세가율(없으면 null=투자관점만).
+    jeonse_ratio: (curJeonse && curJeonse.ratio!=null) ? curJeonse.ratio : null,
   };
   const r=await busy('계산 중…', ()=>jpost('/api/analysis/evaluate/', body));
   if(!r.ok){ $('verdictBox').innerHTML=`<div class="verdict bad"><div class="big">입력을 확인해 주세요</div><div class="exp">${JSON.stringify(r.data)}</div></div>`; return; }
   renderAnalysis(r.data, body);
+}
+
+// 자택(실거주) 관점 — 전세가율 기반 거주가치를 더한 판정. 전세 표본 없으면 안내만.
+function residenceBlock(d, hy){
+  if(d.jeonse_ratio==null){
+    return `<div class="note" style="margin-top:12px">🏠 전세 실거래 표본이 부족해 <b>자택(실거주) 관점</b>은 계산하지 못했어요
+      (매매·전세 같은 평형 각 3건+ 필요).</div>`;
+  }
+  const resGood=d.is_profitable_residence;
+  const v=resGood?'good':'warn';
+  const head=resGood?'실거주라면 — 사도 이득이 남아요 ✅':'실거주라도 — 아직은 빠듯해요';
+  const jr=curJeonse||{};
+  const band=jr.band_m2?`${jr.band_m2}㎡ 기준`:'';
+  return `<div class="verdict ${v}" style="margin-top:14px; margin-bottom:0">
+    <div class="big">🏠 ${head}</div>
+    <div class="exp">전세 대신 직접 살면 <b>매년 거주가치</b>를 누려요(전세가율 <b>${pct(d.jeonse_ratio)}</b> ${band},
+      ${hy}년 누적 <b>${won(d.residence_value)}</b>).
+      이걸 더하면 본전 상승률이 <b>${pct(d.breakeven_rate)} → ${pct(d.breakeven_rate_residence)}</b>로 낮아지고,
+      ${hy}년 순익은 투자관점 <b class="${d.net_profit>=0?'pos':'neg'}">${won(d.net_profit)}</b>에서
+      <b class="${d.net_profit_residence>=0?'pos':'neg'}">${won(d.net_profit_residence)}</b>로 바뀝니다
+      (자택 수익률 ${pct(d.roe_residence)}).</div>
+  </div>`;
 }
 
 function renderAnalysis(d, body){
@@ -448,6 +473,7 @@ function renderAnalysis(d, body){
       <div class="stat"><div class="k"><span class="tip" data-tip="투자수익률(ROE). 내가 실제로 넣은 돈(자기자본+취득비용) 대비 순익 비율.">투자수익률</span></div>
         <div class="v ${d.roe>=0?'pos':'neg'}">${pct(d.roe)}</div><div class="s">내 돈 대비</div></div>
     </div>
+    ${residenceBlock(d, hy)}
 
     <details>
       <summary>세금·비용 자세히 (${hy}년 기준)</summary>
