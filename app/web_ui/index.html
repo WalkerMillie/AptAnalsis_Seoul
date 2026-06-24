@@ -264,6 +264,45 @@
   ::-webkit-scrollbar{ width:9px; height:9px; }
   ::-webkit-scrollbar-thumb{ background:var(--line-2); border-radius:5px; }
   ::-webkit-scrollbar-track{ background:var(--bg); }
+
+  /* ===== AI 분석 섹션 (지역 대비 상대강도) ===== */
+  .ai-panel{ position:relative; isolation:isolate;
+    background:linear-gradient(180deg, color-mix(in srgb,var(--accent) 6%,var(--panel)), var(--panel)); }
+  .ai-panel::before{ content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; z-index:-1;
+    background:linear-gradient(120deg, var(--accent), var(--amber) 55%, var(--cyan));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude; opacity:.55; }
+  .ai-head{ display:flex; align-items:center; gap:8px; }
+  .ai-spark{ color:var(--accent); font-size:14px; filter:drop-shadow(0 0 6px var(--accent)); animation:aiPulse 2.4s ease-in-out infinite; }
+  @keyframes aiPulse{ 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.55; transform:scale(.86); } }
+  .ai-r{ background:linear-gradient(90deg,var(--accent),var(--amber)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+  .ai-box{ padding:15px 17px 16px; }
+  .ai-empty{ color:var(--txt-dim); font-size:12.5px; padding:8px 2px; }
+  /* 다이버징 바 */
+  .rs-bars{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .rs-row{ display:grid; grid-template-columns:96px 1fr 70px; align-items:center; gap:11px; }
+  .rs-row.strong .rs-lab{ color:var(--txt); font-weight:700; }
+  .rs-row.strong .rs-track{ box-shadow:0 0 0 1px var(--accent) inset; }
+  .rs-lab{ font-size:12px; color:var(--txt-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rs-track{ position:relative; height:24px; background:var(--bg); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .rs-zero{ position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line-2); }
+  .rs-fill{ position:absolute; top:3px; bottom:3px; border-radius:4px; transition:width .5s cubic-bezier(.2,.8,.2,1); }
+  .rs-fill.pos{ background:linear-gradient(90deg,color-mix(in srgb,var(--up) 55%,transparent),var(--up)); }
+  .rs-fill.neg{ background:linear-gradient(270deg,color-mix(in srgb,var(--down) 55%,transparent),var(--down)); }
+  .rs-val{ font-family:var(--mono); font-size:12.5px; font-weight:700; text-align:right; }
+  /* 판정 뱃지 + 코멘트 */
+  .rs-verdict{ display:flex; align-items:flex-start; gap:12px; padding:12px 13px; border-radius:9px;
+    background:var(--bg-2); border:1px solid var(--line); }
+  .rs-badge{ flex:0 0 auto; font-family:var(--mono); font-weight:700; font-size:12.5px; letter-spacing:.5px;
+    padding:6px 12px; border-radius:7px; white-space:nowrap; }
+  .rs-msg{ font-size:13px; line-height:1.55; color:var(--txt); }
+  .rs-verdict.tone-up    { border-color:color-mix(in srgb,var(--up) 40%,var(--line)); }
+  .rs-verdict.tone-up    .rs-badge{ background:var(--good-soft); color:var(--up); }
+  .rs-verdict.tone-down  { border-color:color-mix(in srgb,var(--down) 40%,var(--line)); }
+  .rs-verdict.tone-down  .rs-badge{ background:var(--bad-soft); color:var(--down); }
+  .rs-verdict.tone-cyan  .rs-badge{ background:color-mix(in srgb,var(--cyan) 16%,transparent); color:var(--cyan); }
+  .rs-verdict.tone-amber .rs-badge{ background:var(--warn-soft); color:var(--amber); }
+  .rs-foot{ margin-top:10px; font-family:var(--mono); font-size:10.5px; color:var(--txt-mute); letter-spacing:.3px; }
 </style>
 </head>
 <body>
@@ -362,6 +401,11 @@
         <div id="heroBox"><div class="empty" style="padding:54px 20px; line-height:1.8">← 왼쪽에서 단지를 선택하면<br>매수 판정이 여기에 표시됩니다</div></div>
         <div id="verdictBar"></div>
         <div id="kpiStrip"></div>
+      </div>
+
+      <div class="panel ai-panel hidden" id="aiPanel">
+        <div class="phead ai-head"><span class="ai-spark">✦</span> AI 분석 · 지역 대비 <span class="r ai-r">RELATIVE STRENGTH</span></div>
+        <div class="ai-box" id="aiBox"></div>
       </div>
 
       <div class="panel hidden" id="chartPanel">
@@ -629,16 +673,18 @@ async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
-  const [series, growth, trades, jeonse, jeonseSeries] = await busy('이 단지 분석 중…', ()=>Promise.all([
+  const [series, growth, trades, jeonse, jeonseSeries, regsum] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
     jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
+    getRegsum(),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
   const latest = (trades.trades||[])[0];
   renderHero(c, series, growth, latest, jeonse);
+  renderAI(c, growth, regsum);
   // 매매 + 전세 추세 차트(같은 평형 기준). 전세 표본 없으면 매매만.
   let charts = `<div class="note" style="margin:2px 0 2px; color:var(--txt-dim)">매매 평당 시세 (${series.band_m2?py(series.band_m2):'-'})</div>` + lineChart(series.series);
   if(jeonseSeries && jeonseSeries.series && jeonseSeries.series.length>=2){
@@ -685,6 +731,73 @@ function renderHero(c, series, growth, latest, jeonse){
       ${latest?`<div class="meta">최근 실거래 ${won(latest.price)} · ${latest.contract_date} · ${latest.floor}층</div>`:''}
     </div>
   </div>`;
+}
+
+// ===== AI 분석: 지역 대비 상대강도(RS) =====
+// 비교 데이터는 전부 기존 소스 재사용 — 구=region_summary(캐시), 동=현재 단지리스트 중앙값.
+let _regsumCache={};
+async function getRegsum(){
+  if(_regsumCache[listMonths]) return _regsumCache[listMonths];
+  const r=await jget(`/api/market_data/region_summary/?months=${listMonths}&min_trades=10`);
+  _regsumCache[listMonths]=r; return r;
+}
+const _median = arr => { const v=arr.filter(x=>x!=null).sort((a,b)=>a-b); if(!v.length) return null;
+  const m=v.length>>1; return v.length%2 ? v[m] : (v[m-1]+v[m])/2; };
+
+// 단지 g와 동 평균 dong으로 4분면 판정(지역 방향 × 단지 상대강도). 동조대는 ±2%p.
+function rsVerdict(g, dong){
+  const rs=g-dong, FLAT=0.02, up=dong>=0;
+  if(Math.abs(rs)<FLAT) return {key:'sync', label:'동조', tone:'amber',
+    msg:`동네 흐름과 거의 같이 움직였어요(±${pctp(rs)}). 지역 장세를 그대로 따라가는 단지예요.`};
+  if(up){
+    if(g<0) return {key:'warn', label:'⚠ 역행 경고', tone:'down',
+      msg:`동네는 오르는데 이 단지만 빠졌어요. 단지 고유 악재나 표본 왜곡일 수 있어 꼭 확인하세요.`};
+    if(rs>=0) return {key:'leader', label:'주도주', tone:'up',
+      msg:`동네보다 ${pctp(rs)} 더 올라 흐름을 이끄는 단지예요. 입지·단지 모두 강세지만 이미 비쌀 수 있어요.`};
+    return {key:'laggard', label:'후발 주자', tone:'cyan',
+      msg:`동네는 오르는데 ${pctp(-rs)} 덜 올랐어요. 따라잡을 여지(저평가)일 수도, 소외된 이유가 있을 수도 — “왜 덜 올랐나”가 관건.`};
+  } else {
+    if(rs>=0) return {key:'defensive', label:'방어주', tone:'up',
+      msg:`하락장에서도 동네보다 ${pctp(rs)} 잘 버텼어요. 실수요가 탄탄한 편. 단 지역 자체가 약세인 국면은 유의.`};
+    return {key:'fragile', label:'취약', tone:'down',
+      msg:`동네보다 ${pctp(-rs)} 더 빠졌어요. 동반 약세 + 고유 약점 가능성 — 신중히 보세요.`};
+  }
+}
+
+function renderAI(c, growth, regsum){
+  const g = (growth && growth.growth!=null) ? growth.growth : (c.growth ?? null);
+  const dong = _median((_complexList||[]).map(x=>x.growth));
+  const gu = (regsum && regsum.regions && regsum.regions[curRegion]) ? regsum.regions[curRegion].median_growth : null;
+  const box=$('aiBox'); $('aiPanel').classList.remove('hidden');
+  if(g==null || dong==null){
+    box.innerHTML=`<div class="ai-empty">표본이 부족해 지역 대비 분석을 만들 수 없어요. 거래가 더 쌓이면 표시됩니다.</div>`;
+    return;
+  }
+  const v=rsVerdict(g, dong);
+  // 다이버징 바: 0 중앙, 양수 오른쪽/음수 왼쪽. maxAbs로 스케일.
+  const vals=[gu,dong,g].filter(x=>x!=null).map(Math.abs);
+  const maxAbs=Math.max(0.05, ...vals);
+  const bar=(val,label,strong)=>{
+    if(val==null) return `<div class="rs-row"><span class="rs-lab">${label}</span><div class="rs-track"></div><span class="rs-val dim">—</span></div>`;
+    const w=Math.min(50, Math.abs(val)/maxAbs*50), pos=val>=0;
+    return `<div class="rs-row${strong?' strong':''}">
+      <span class="rs-lab">${label}</span>
+      <div class="rs-track"><span class="rs-zero"></span>
+        <span class="rs-fill ${pos?'pos':'neg'}" style="${pos?'left:50%':'right:50%'};width:${w}%"></span></div>
+      <span class="rs-val ${pos?'up':'down'}">${pos?'+':''}${pct(val)}</span></div>`;
+  };
+  const guName=(districtName[curRegion]||'구');
+  box.innerHTML=`
+    <div class="rs-bars">
+      ${bar(gu, guName, false)}
+      ${bar(dong, curDong||'동', false)}
+      ${bar(g, c.apt_name, true)}
+    </div>
+    <div class="rs-verdict tone-${v.tone}">
+      <div class="rs-badge">${v.label}</div>
+      <div class="rs-msg">${v.msg}</div>
+    </div>
+    <div class="rs-foot">최근 ${growth.months||listMonths}개월 · 구/동 중앙값 대비 · 표본 ${growth.window_trades||c.window_trades||c.trade_count||'-'}건${growth.confidence_tier?' · 신뢰도 '+growth.confidence_tier:''}</div>`;
 }
 
 // 자기자본 = 매매가 − 대출 (자동, 억 단위). 대출이 매매가보다 크면 경고.
