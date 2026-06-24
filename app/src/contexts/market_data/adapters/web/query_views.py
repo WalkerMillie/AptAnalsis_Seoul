@@ -55,12 +55,12 @@ class TradeListView(APIView):
 
 
 def _months(request) -> int:
-    """months 쿼리 파라미터(기본 3, 1~60으로 클램프). 장기 데이터(2~4년) 대비 상한 상향."""
+    """months 쿼리 파라미터(기본 3, 1~120으로 클램프). 10년치 백필 대비 상한 120(=10년)."""
     try:
         m = int(request.query_params.get("months", 3))
     except (TypeError, ValueError):
         m = 3
-    return max(1, min(60, m))
+    return max(1, min(120, m))
 
 
 class PriceSeriesView(APIView):
