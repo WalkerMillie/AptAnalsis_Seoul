@@ -303,6 +303,10 @@
   .rs-verdict.tone-cyan  .rs-badge{ background:color-mix(in srgb,var(--cyan) 16%,transparent); color:var(--cyan); }
   .rs-verdict.tone-amber .rs-badge{ background:var(--warn-soft); color:var(--amber); }
   .rs-foot{ margin-top:10px; font-family:var(--mono); font-size:10.5px; color:var(--txt-mute); letter-spacing:.3px; }
+
+  /* 네이버 바로가기 칩 */
+  a.chip.nv{ text-decoration:none; color:#03c75a; border-color:color-mix(in srgb,#03c75a 45%,var(--line)); font-weight:700; }
+  a.chip.nv:hover{ background:color-mix(in srgb,#03c75a 14%,transparent); border-color:#03c75a; }
 </style>
 </head>
 <body>
@@ -723,6 +727,7 @@ function renderHero(c, series, growth, latest, jeonse){
         ${band?`<span class="chip">${py(band)} · ${Math.round(band)}㎡</span>`:''}
         ${by?`<span class="chip">🏗 ${by}년 · ${2026-by}년차</span>`:''}
         ${jr?`<span class="chip b">전세가율 ${pct(jr.ratio)}</span>`:''}
+        <a class="chip nv" href="https://search.naver.com/search.naver?query=${encodeURIComponent(((districtName[curRegion]||'')+' '+(curDong||'')+' '+c.apt_name).trim()+' 아파트')}" target="_blank" rel="noopener" title="네이버에서 이 단지 검색">네이버 ↗</a>
       </div>
     </div>
     <div class="hero-price">
