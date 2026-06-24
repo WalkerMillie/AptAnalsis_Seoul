@@ -274,8 +274,34 @@ class TradeQueryService:
             "complex_id": complex_id, "months": months, "band_m2": band,
             "ratio": round(rent_ppm2 / sale_ppm2, 4),
             "sale_ppm2": round(sale_ppm2), "rent_ppm2": round(rent_ppm2),
+            # 대표 평형 기준 절대 금액(원) — 매매 시세·전세 보증금 시세(표시용).
+            "sale_price": round(sale_ppm2 * band), "rent_deposit": round(rent_ppm2 * band),
             "sale_n": len(sale_b[band]), "rent_n": len(rent_b[band]),
         }
+
+    def jeonse_series(self, complex_id: str, months: int = 12) -> dict:
+        """단지의 월별 중앙 전세 ㎡당 보증금 시계열(대표 평형) — 전세 추세 차트용.
+
+        price_series(매매)의 전세 판. 대표 평형 = 윈도우 내 전세 거래 최다 전용(밴드).
+        anchor는 전세 데이터 자체의 최신월(매매와 평형·월이 다를 수 있어 독립 산정).
+        """
+        rents = [r for r in self._store.rows("rents")
+                 if r.complex_id == complex_id and r.area_m2 > 0]
+        if not rents:
+            return {"complex_id": complex_id, "months": months, "band_m2": None, "series": []}
+        anchor = max(_month_idx(r.contract_date) for r in rents)
+        start = anchor - (months - 1)
+        win = [r for r in rents if start <= _month_idx(r.contract_date) <= anchor]
+        if not win:
+            return {"complex_id": complex_id, "months": months, "band_m2": None, "series": []}
+        band = Counter(_band(r.area_m2) for r in win).most_common(1)[0][0]
+        by_month: dict = {}
+        for r in win:
+            if _band(r.area_m2) == band:
+                by_month.setdefault(_month_idx(r.contract_date), []).append(r.deposit / r.area_m2)
+        series = [{"ym": _ym_label(i), "ppm2": round(median(v)), "n": len(v)}
+                  for i, v in sorted(by_month.items())]
+        return {"complex_id": complex_id, "months": months, "band_m2": band, "series": series}
 
     def region_summary(self, months: int = 12, min_trades: int = 10) -> dict:
         """구(region_code)별 단지 상승률 중앙값 — 지도 색칠(choropleth)용.

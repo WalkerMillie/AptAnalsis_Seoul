@@ -205,8 +205,10 @@
       <div class="row" style="margin-top:12px">
         <div class="grow"><label>매매가 (원)</label><input id="purchase_price" type="number"></div>
         <div class="grow"><label>대출액 (원)</label><input id="loan_amount" type="number" value="600000000"></div>
-        <div class="grow"><label>자기자본 (원)</label><input id="equity" type="number" value="400000000"></div>
+        <div class="grow"><label>자기자본 (원) <span class="muted" style="font-weight:400">· 자동 = 매매가 − 대출</span></label>
+          <input id="equity" type="number" readonly style="background:#f4f6f9"></div>
       </div>
+      <div id="fundWarn" class="note hidden" style="color:var(--bad)"></div>
       <div class="row" style="margin-top:10px">
         <div class="grow"><label>대출 금리 (예: 0.045 = 4.5%)</label><input id="effective_rate" type="number" step="0.001" value="0.045"></div>
         <div class="grow"><label>보유 기간 (년)</label><input id="holding_years" type="number" step="0.5" value="2"></div>
@@ -386,11 +388,12 @@ async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
-  const [series, growth, trades, jeonse] = await busy('이 단지 분석 중…', ()=>Promise.all([
+  const [series, growth, trades, jeonse, jeonseSeries] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
+    jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
   $('step3').classList.remove('hidden');
@@ -398,10 +401,17 @@ async function selectComplex(c, el){
   const latest = (trades.trades||[])[0];
   const by = latest && latest.build_year ? latest.build_year : 0;
   const byTxt = by ? ` · 🏗 건축 <b>${by}년</b> (${2026-by}년차)` : '';
+  const jr = (jeonse && jeonse.ratio!=null) ? jeonse : null;
   $('cxSub').innerHTML = `${curDong} · ${series.band_m2?series.band_m2+'㎡ 기준':''}`
     + (latest? ` · 최근 실거래 <b>${won(latest.price)}</b> (${latest.contract_date}, ${latest.area_m2}㎡, ${latest.floor}층)`:'')
+    + (jr? ` · 전세 시세 <b>${won(jr.rent_deposit)}</b> (전세가율 ${pct(jr.ratio)})`:'')
     + byTxt;
-  $('chartBox').innerHTML = `<div class="muted" style="font-size:12px; margin-bottom:4px">평당 시세 추세 (최근 12개월, ${series.band_m2||'-'}㎡)</div>` + lineChart(series.series);
+  // 매매 + 전세 추세 차트(같은 평형 기준). 전세 표본 없으면 매매만.
+  let charts = `<div class="muted" style="font-size:12px; margin-bottom:4px">📈 매매 평당 시세 추세 (최근 12개월, ${series.band_m2||'-'}㎡)</div>` + lineChart(series.series);
+  if(jeonseSeries && jeonseSeries.series && jeonseSeries.series.length>=2){
+    charts += `<div class="muted" style="font-size:12px; margin:14px 0 4px">🏠 전세 평당 보증금 추세 (최근 12개월, ${jeonseSeries.band_m2||'-'}㎡)</div>` + lineChart(jeonseSeries.series);
+  }
+  $('chartBox').innerHTML = charts;
 
   // 내 조건 자동 프리필
   if(latest) $('purchase_price').value = latest.price;
@@ -410,8 +420,21 @@ async function selectComplex(c, el){
   $('step3').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
+// 자기자본 = 매매가 − 대출 (자동). 대출이 매매가보다 크면 경고.
+function syncEquity(){
+  const p=+$('purchase_price').value||0, l=+$('loan_amount').value||0;
+  const eq=p-l;
+  $('equity').value = Math.max(0, eq);
+  const w=$('fundWarn');
+  if(p>0 && l>p){ w.textContent=`⚠️ 대출액(${won(l)})이 매매가(${won(p)})보다 큽니다 — 대출액을 줄여 주세요.`; w.classList.remove('hidden'); }
+  else { w.classList.add('hidden'); }
+}
+$('purchase_price').addEventListener('input', syncEquity);
+$('loan_amount').addEventListener('input', syncEquity);
+
 $('analyzeBtn').onclick=(e)=>{ e.preventDefault(); runAnalyze(); };
 async function runAnalyze(){
+  syncEquity();
   const body={
     complex_id: curComplex? curComplex.complex_id : 'UNKNOWN',
     purchase_price:+$('purchase_price').value, loan_amount:+$('loan_amount').value,
@@ -437,9 +460,10 @@ function residenceBlock(d, hy){
   const head=resGood?'실거주라면 — 사도 이득이 남아요 ✅':'실거주라도 — 아직은 빠듯해요';
   const jr=curJeonse||{};
   const band=jr.band_m2?`${jr.band_m2}㎡ 기준`:'';
+  const depTxt=jr.rent_deposit?`전세 시세 <b>${won(jr.rent_deposit)}</b> · `:'';
   return `<div class="verdict ${v}" style="margin-top:14px; margin-bottom:0">
     <div class="big">🏠 ${head}</div>
-    <div class="exp">전세 대신 직접 살면 <b>매년 거주가치</b>를 누려요(전세가율 <b>${pct(d.jeonse_ratio)}</b> ${band},
+    <div class="exp">전세 대신 직접 살면 <b>매년 거주가치</b>를 누려요(${depTxt}전세가율 <b>${pct(d.jeonse_ratio)}</b> ${band},
       ${hy}년 누적 <b>${won(d.residence_value)}</b>).
       이걸 더하면 본전 상승률이 <b>${pct(d.breakeven_rate)} → ${pct(d.breakeven_rate_residence)}</b>로 낮아지고,
       ${hy}년 순익은 투자관점 <b class="${d.net_profit>=0?'pos':'neg'}">${won(d.net_profit)}</b>에서

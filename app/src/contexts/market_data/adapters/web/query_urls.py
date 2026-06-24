@@ -4,7 +4,8 @@ from django.urls import path
 
 from contexts.market_data.adapters.web.query_views import (
     ComplexListView, ComplexScoreView, DongListView, DongSearchView, JeonseRatioView,
-    PriceGrowthView, PriceSeriesView, RankingView, RegionSummaryView, TradeListView,
+    JeonseSeriesView, PriceGrowthView, PriceSeriesView, RankingView, RegionSummaryView,
+    TradeListView,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
     path("rankings/", RankingView.as_view(), name="market_data_rankings"),
     path("region_summary/", RegionSummaryView.as_view(), name="market_data_region_summary"),
     path("jeonse_ratio/", JeonseRatioView.as_view(), name="market_data_jeonse_ratio"),
+    path("jeonse_series/", JeonseSeriesView.as_view(), name="market_data_jeonse_series"),
 ]

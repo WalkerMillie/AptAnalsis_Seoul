@@ -120,6 +120,16 @@ class JeonseRatioView(APIView):
         return Response(get_trade_query().jeonse_ratio(complex_id, _months(request)))
 
 
+class JeonseSeriesView(APIView):
+    """GET /api/market_data/jeonse_series/?complex_id=..&months=12 — 월별 전세 ㎡당 보증금 추세."""
+
+    def get(self, request):
+        complex_id = request.query_params.get("complex_id", "")
+        if not complex_id:
+            return Response({"detail": "complex_id 필수"}, status=400)
+        return Response(get_trade_query().jeonse_series(complex_id, _months(request)))
+
+
 class ComplexScoreView(APIView):
     """GET /api/market_data/complex_scores/?region_code=..&dong=..&months=6 — 단지별 상승률(비교/정렬)."""
 
