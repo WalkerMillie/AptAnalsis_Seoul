@@ -125,7 +125,17 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
   #overlay .msg{ font-weight:600; } #overlay .sub{ color:var(--muted); font-size:12.5px; }
 
-  @media(max-width:560px){ .grid{ grid-template-columns:1fr 1fr; } header.top h1{ font-size:21px; } }
+  /* 상단 탭 메뉴 */
+  nav.tabs{ display:flex; gap:6px; position:sticky; top:0; z-index:20; background:var(--bg);
+    padding:8px 0 10px; margin-bottom:2px; border-bottom:1px solid var(--line); }
+  nav.tabs button{ flex:0 0 auto; border:1px solid var(--line); background:#fff; color:var(--muted);
+    padding:9px 16px; border-radius:10px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  nav.tabs button.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  nav.tabs button:hover:not(.on){ border-color:var(--accent); color:var(--accent); }
+  .view{ display:none; } .view.on{ display:block; }
+
+  @media(max-width:560px){ .grid{ grid-template-columns:1fr 1fr; } header.top h1{ font-size:21px; }
+    nav.tabs button{ padding:8px 11px; font-size:13px; } }
 </style>
 </head>
 <body>
@@ -157,6 +167,15 @@
     </div>
     <p class="note" id="collectMsg"></p>
   </section>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="analyze" class="on">🔍 단지 분석</button>
+    <button data-view="explore">🗺 지도·랭킹</button>
+    <button data-view="reco">◎ 맞춤 추천</button>
+  </nav>
+
+  <!-- ===== 뷰: 단지 분석 (동네→단지→손익) ===== -->
+  <div class="view on" id="vAnalyze">
 
   <!-- STEP 1 -->
   <section class="card">
@@ -223,6 +242,11 @@
     </details>
   </section>
 
+  </div><!-- /vAnalyze -->
+
+  <!-- ===== 뷰: 지도·랭킹 ===== -->
+  <div class="view" id="vExplore">
+
   <!-- STEP 4: 전체 랭킹 / 지도 -->
   <section class="card">
     <div class="step"><div class="num">★</div><h2>서울 어디가 오르나</h2>
@@ -253,6 +277,11 @@
     </div>
   </section>
 
+  </div><!-- /vExplore -->
+
+  <!-- ===== 뷰: 맞춤 추천 ===== -->
+  <div class="view" id="vReco">
+
   <!-- STEP 5: 맞춤 추천 (가중치 랭킹) -->
   <section class="card">
     <div class="step"><div class="num">◎</div><h2>내 우선순위로 단지 찾기</h2>
@@ -271,6 +300,8 @@
     <div class="note" id="recoLegend"></div>
     <div id="recoList" class="clist" style="max-height:560px"></div>
   </section>
+
+  </div><!-- /vReco -->
 
   <p class="note" style="text-align:center; margin-top:24px">
     실거래가는 국토부 공개 데이터 기준이며, 세금·비용은 2026 기준 근사치입니다. 투자 판단의 참고 자료입니다.
@@ -367,6 +398,7 @@ $('dongSearch').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch();
 // ===== STEP 2 =====
 let curRegion=null, curDong=null, listMonths=12, _complexList=[];
 async function openDong(code, dong, autoCid){
+  showView('analyze', false);     // 지도·추천에서 진입 시 분석 뷰로 전환
   curRegion=code; curDong=dong;
   $('district').value=code; await loadDongs(code); $('dong').value=dong;
   await loadComplexes();
@@ -739,6 +771,15 @@ $('recoMonthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   $('recoMonthsSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); recoMonths=+b.dataset.m; loadCandidates();
 });
+
+// ===== 뷰 전환 (상단 탭) =====
+function showView(name, scroll=true){
+  const id = 'v' + name[0].toUpperCase() + name.slice(1);   // analyze→vAnalyze
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on', v.id===id));
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.view===name));
+  if(scroll) window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
 
 (async()=>{ await loadDistricts(); loadDataInfo(); renderMap(); buildWeightSliders(); loadCandidates(); })();
 </script>
