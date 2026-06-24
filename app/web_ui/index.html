@@ -612,7 +612,7 @@ async function loadComplexes(){
             : `<div class="g ${c.growth>=0?'pos':'neg'}">${c.growth>=0?'▲':'▼'} ${pct(Math.abs(c.growth))}</div>`;
     el.innerHTML=`<div class="rank">${i+1}</div>
       <div><div class="nm">${c.apt_name}</div>
-        <div class="meta">${c.band_m2?py(c.band_m2)+' 기준 · ':''}거래 ${c.trade_count}건 · ${conf(c.confidence,c.confidence_tier)}</div></div>
+        <div class="meta">최근 <b style="color:var(--txt)">${c.recent_price!=null?won(c.recent_price):'—'}</b>${c.recent_area?' · '+py(c.recent_area):''} · ${c.trade_count}건 · ${conf(c.confidence,c.confidence_tier)}</div></div>
       <div class="grow">${g}<div class="meta">${listMonths}개월</div></div>`;
     el.onclick=()=>selectComplex(c, el);
     $('complexes').appendChild(el);

@@ -209,24 +209,32 @@ class TradeQueryService:
         if anchor is None:
             return []
         start = anchor - (months - 1)
-        per: dict = {}          # complex_id → {"name", "count", "points"}
+        per: dict = {}          # complex_id → {"name", "count", "points", "recent"}
         for t in all_rows:
             if t.region_code != region_code or t.legal_dong != dong or t.area_m2 <= 0:
                 continue
-            e = per.setdefault(t.complex_id, {"name": t.apt_name, "count": 0, "points": []})
+            e = per.setdefault(t.complex_id,
+                               {"name": t.apt_name, "count": 0, "points": [], "recent": None})
             e["count"] += 1
+            # 최신 실거래(계약일 max) — trades()/hero가 쓰는 값과 동일 소스로 일관 유지.
+            if e["recent"] is None or t.contract_date > e["recent"]["date"]:
+                e["recent"] = {"date": t.contract_date, "price": t.price, "area_m2": t.area_m2}
             idx = _month_idx(t.contract_date)
             if start <= idx <= anchor:
                 e["points"].append((idx, t.area_m2, t.price / t.area_m2))
         out = []
         for cid, e in per.items():
             g = _growth_from_points(e["points"])
+            rc = e["recent"]
             out.append({"complex_id": cid, "apt_name": e["name"], "trade_count": e["count"],
                         "months": months,
                         "growth": (g["growth"] if g else None),
                         "confidence": (g["confidence"] if g else None),
                         "confidence_tier": (g["confidence_tier"] if g else None),
                         "band_m2": (g["band_m2"] if g else None),
+                        "recent_price": (rc["price"] if rc else None),
+                        "recent_area": (rc["area_m2"] if rc else None),
+                        "recent_date": (rc["date"].isoformat() if rc else None),
                         "months_covered": len({i for i, _, _ in e["points"]}),
                         "window_trades": len(e["points"])})
         # 상승률 있는 단지 우선(내림차순), 표본부족(None)은 뒤로.
