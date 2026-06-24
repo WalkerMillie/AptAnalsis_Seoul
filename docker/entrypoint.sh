@@ -17,7 +17,10 @@ TRADE_COUNT=${TRADE_COUNT:-0}
 if [ "$SEED_ON_START" = "1" ] && [ "$TRADE_COUNT" -eq 0 ]; then
   echo "▶ DB 비어있음 → 백필 시딩 (months: $SEED_MONTHS). 25개 구 × N개월, 수 분 소요…"
   # shellcheck disable=SC2086
-  python backfill.py $SEED_MONTHS || echo "⚠️ 백필 일부 실패 — 서버는 계속 기동"
+  python backfill.py trades $SEED_MONTHS || echo "⚠️ 매매 백필 일부 실패 — 계속"
+  # 전세도 시딩(전월세 API 미승인 키면 FAILED로 graceful — 서버는 계속).
+  # shellcheck disable=SC2086
+  python backfill.py rents $SEED_MONTHS || echo "⚠️ 전세 백필 일부 실패 — 계속"
 else
   echo "▶ 기존 실거래 ${TRADE_COUNT}건 — 시딩 건너뜀"
 fi

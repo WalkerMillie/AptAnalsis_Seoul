@@ -18,6 +18,7 @@ _MIN_MONTHS = 3      # 서로 다른 거래월 최소 개수
 _MIN_TRADES = 5      # 윈도우 내 거래 최소 건수
 _MIN_SEG = 3         # 첫 구간·끝 구간 각각 최소 거래수(외딴 1건 끝점 차단=끝점 견고화)
 _MIN_BAND_SEG = 2    # 대표 평형의 첫·끝 구간 각 최소 거래수(평형 정규화 endpoint)
+_MIN_RATIO_SEG = 3   # 전세가율: 같은 평형의 매매·전세 각 최소 표본(median 비율 안정화)
 _INSUFFICIENT = (f"표본 부족(거래월 {_MIN_MONTHS}개·거래 {_MIN_TRADES}건·양끝 각 {_MIN_SEG}건·"
                  f"같은 평형 양끝 각 {_MIN_BAND_SEG}건 비교 가능해야 함)")
 
@@ -231,6 +232,50 @@ class TradeQueryService:
         # 상승률 있는 단지 우선(내림차순), 표본부족(None)은 뒤로.
         out.sort(key=lambda x: (x["growth"] is not None, x["growth"] or 0), reverse=True)
         return out
+
+    def jeonse_ratio(self, complex_id: str, months: int = 12) -> dict:
+        """단지의 전세가율(전세 ㎡당 보증금 ÷ 매매 ㎡당가, 평형 정규화) — 최근 months 윈도우.
+
+        매매·전세를 같은 대표 평형(밴드)에서 median끼리 비교(믹스 왜곡 제거). 거주가치
+        입력으로 쓰인다(buy-vs-rent). ratio=None이면 reason에 사유. 양쪽 표본이 있어야.
+        """
+        sales = [t for t in self._store.rows("trades")
+                 if t.complex_id == complex_id and t.area_m2 > 0]
+        rents = [r for r in self._store.rows("rents")
+                 if r.complex_id == complex_id and r.area_m2 > 0]
+        if not sales:
+            return {"complex_id": complex_id, "ratio": None, "reason": "매매 실거래 없음"}
+        if not rents:
+            return {"complex_id": complex_id, "ratio": None, "reason": "전세 실거래 없음"}
+        anchor = max(_month_idx(t.contract_date) for t in sales)
+        start = anchor - (months - 1)
+
+        def _by_band(rows, value):
+            out: dict = {}
+            for x in rows:
+                if start <= _month_idx(x.contract_date) <= anchor:
+                    out.setdefault(_band(x.area_m2), []).append(value(x) / x.area_m2)
+            return out
+        sale_b = _by_band(sales, lambda t: t.price)
+        rent_b = _by_band(rents, lambda r: r.deposit)
+        # 게이트: 같은 평형에서 매매·전세 각 _MIN_RATIO_SEG건 이상이라야 median 비율이 안정.
+        # (신축처럼 매매 1건뿐인 밴드를 뽑아 전세가율이 비현실적으로 튀는 것 차단)
+        common = [b for b in sale_b if b in rent_b
+                  and len(sale_b[b]) >= _MIN_RATIO_SEG and len(rent_b[b]) >= _MIN_RATIO_SEG]
+        if not common:
+            return {"complex_id": complex_id, "ratio": None, "months": months,
+                    "reason": (f"같은 평형의 매매·전세 각 {_MIN_RATIO_SEG}건+ 동시 표본 없음 "
+                               "(매매 회전 적은 단지)")}
+        # 대표 평형 = 매매+전세 표본 최다 밴드
+        band = max(common, key=lambda b: len(sale_b[b]) + len(rent_b[b]))
+        sale_ppm2 = median(sale_b[band])
+        rent_ppm2 = median(rent_b[band])
+        return {
+            "complex_id": complex_id, "months": months, "band_m2": band,
+            "ratio": round(rent_ppm2 / sale_ppm2, 4),
+            "sale_ppm2": round(sale_ppm2), "rent_ppm2": round(rent_ppm2),
+            "sale_n": len(sale_b[band]), "rent_n": len(rent_b[band]),
+        }
 
     def region_summary(self, months: int = 12, min_trades: int = 10) -> dict:
         """구(region_code)별 단지 상승률 중앙값 — 지도 색칠(choropleth)용.

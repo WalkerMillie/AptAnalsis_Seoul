@@ -11,6 +11,7 @@ from contexts.market_data.application.trade_query_service import TradeQueryServi
 from contexts.market_data.adapters.db.django_store import DjangoTradeStore
 from contexts.market_data.adapters.fake_sources import make_fetchers
 from contexts.market_data.adapters.molit_source import MolitTradesSource
+from contexts.market_data.adapters.molit_rent_source import MolitRentsSource
 
 # 영속 스토어(Django ORM). 수집·조회·재시작 모두 같은 DB를 본다.
 # 포트(JobStore)만 맞추면 인메모리/PostgreSQL 등으로 교체 가능 — 도메인 불변.
@@ -34,17 +35,23 @@ def _build_fetchers() -> dict:
     fetchers = make_fetchers()
     key = os.environ.get("MOLIT_SERVICE_KEY")
     if key:
-        src = MolitTradesSource(key)
         lawds = [c.strip() for c in os.environ.get(
             "MOLIT_LAWD_CODES", "11680,11650,11710").split(",") if c.strip()]
 
-        def fetch_trades(deal_ym: str) -> list:
-            out: list = []
-            for code in lawds:
-                out.extend(src(region_code=code, deal_ym=deal_ym))
-            return out
+        trade_src = MolitTradesSource(key)
+        rent_src = MolitRentsSource(key)
 
-        fetchers["trades"] = fetch_trades
+        def _looped(src):
+            """소스를 25개 구 순회로 감싼다(fetcher 계약: (deal_ym)->list)."""
+            def fetch(deal_ym: str) -> list:
+                out: list = []
+                for code in lawds:
+                    out.extend(src(region_code=code, deal_ym=deal_ym))
+                return out
+            return fetch
+
+        fetchers["trades"] = _looped(trade_src)
+        fetchers["rents"] = _looped(rent_src)        # 전세(월세 제외) — 같은 키
     return fetchers
 
 

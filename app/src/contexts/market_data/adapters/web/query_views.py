@@ -110,6 +110,16 @@ class RankingView(APIView):
             limit=_int("limit", 100, 1, 500)))
 
 
+class JeonseRatioView(APIView):
+    """GET /api/market_data/jeonse_ratio/?complex_id=..&months=12 — 단지 전세가율(평형 정규화)."""
+
+    def get(self, request):
+        complex_id = request.query_params.get("complex_id", "")
+        if not complex_id:
+            return Response({"detail": "complex_id 필수"}, status=400)
+        return Response(get_trade_query().jeonse_ratio(complex_id, _months(request)))
+
+
 class ComplexScoreView(APIView):
     """GET /api/market_data/complex_scores/?region_code=..&dong=..&months=6 — 단지별 상승률(비교/정렬)."""
 

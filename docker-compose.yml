@@ -16,6 +16,9 @@ services:
     volumes:
       # DB만 영속 — 코드는 이미지에 포함. 한 번 시딩하면 재기동은 즉시.
       - seoul_db:/data
+      # 개발 편의: 호스트 코드를 마운트해 runserver 자동 리로드(이미지 재빌드 불필요).
+      # 의존성은 시스템 site-packages에 있어 /app 덮어써도 안전. 배포 시 이 줄 제거.
+      - ./app:/app
     restart: unless-stopped
 
 volumes:

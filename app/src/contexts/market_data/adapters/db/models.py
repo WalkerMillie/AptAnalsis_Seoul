@@ -25,6 +25,26 @@ class TradeRecord(models.Model):
         ]
 
 
+class RentRecord(models.Model):
+    """전세 실거래 영속. TradeRecord와 같은 자연키 전략(idempotent upsert)."""
+    complex_id = models.CharField(max_length=200, db_index=True)
+    apt_name = models.CharField(max_length=200)
+    region_code = models.CharField(max_length=10, db_index=True)
+    legal_dong = models.CharField(max_length=100, db_index=True)
+    area_m2 = models.FloatField()
+    deposit = models.BigIntegerField()    # 전세보증금(원)
+    floor = models.IntegerField()
+    contract_date = models.DateField()
+    build_year = models.IntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["complex_id", "contract_date", "area_m2", "floor"],
+                name="uq_rent_natural"),
+        ]
+
+
 class CollectionJobRecord(models.Model):
     job_type = models.CharField(max_length=40)
     target_date = models.CharField(max_length=20)

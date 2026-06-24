@@ -5,8 +5,9 @@
 도메인/유스케이스는 손대지 않는다 — 이 스크립트는 트리거만 반복하는 바깥 도구다.
 
 사용:
-  ../.venv/bin/python backfill.py 202603 202604 202605
-  ../.venv/bin/python backfill.py            # 기본 월 세트
+  ../.venv/bin/python backfill.py 202603 202604 202605          # 매매(기본)
+  ../.venv/bin/python backfill.py rents 202603 202604 202605    # 전세
+  ../.venv/bin/python backfill.py            # 매매 기본 월 세트
 """
 
 import os
@@ -22,19 +23,23 @@ from contexts.market_data.adapters.web.composition import get_service  # noqa: E
 _DEFAULT_MONTHS = ["202603", "202604", "202605"]
 
 
-def main(months: list[str]) -> None:
+def main(job_type: str, months: list[str]) -> None:
     if not os.environ.get("MOLIT_SERVICE_KEY"):
         print("⚠️  MOLIT_SERVICE_KEY 없음 — fake 소스로 백필됩니다(실데이터 아님).")
     total = 0
     for ym in months:
-        job = get_service().run("trades", ym)
+        job = get_service().run(job_type, ym)
         state = job.state.name
         added = job.fetched_count
         total += added if state == "DONE" else 0
         mark = "✓" if state == "DONE" else "✗"
-        print(f"{mark} {ym}: {state} (+{added}건){' — ' + job.error if job.error else ''}")
+        print(f"{mark} {job_type} {ym}: {state} (+{added}건){' — ' + job.error if job.error else ''}")
     print(f"\n총 추가 {total}건 (기존 행은 idempotent upsert로 중복 안 됨).")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or _DEFAULT_MONTHS)
+    args = sys.argv[1:]
+    job = "trades"
+    if args and args[0] in ("trades", "rents"):     # 첫 인자가 job_type이면 분리
+        job = args.pop(0)
+    main(job, args or _DEFAULT_MONTHS)

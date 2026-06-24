@@ -118,13 +118,29 @@ def _fully_exempt(sale_price: float, holding_years: float, *, is_first_home: boo
                 and sale_price <= T.HIGH_PRICE_THRESHOLD)
 
 
+# ── 거주가치(자가 거주효용) ──
+def residence_value_annual(purchase_price: float, jeonse_ratio: float,
+                           conversion_rate: float = T.RENT_CONVERSION_RATE) -> float:
+    """자가 거주의 연 거주가치(원) = 전세보증금 × 전월세전환율.
+
+    "이 집에 전세로 살았다면 묶였을 보증금의 기회비용" = 자가가 점유로 누리는 임대 서비스.
+    전세보증금 ≈ 매매가 × 전세가율. 자택(실거주) 손익에 더해야 현실적 판정이 된다.
+    """
+    if jeonse_ratio <= 0:
+        return 0.0
+    return purchase_price * jeonse_ratio * conversion_rate
+
+
 def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float,
                      effective_rate: float, growth: float, holding_years: float,
-                     opportunity_rate: float, is_first_home: bool) -> dict:
+                     opportunity_rate: float, is_first_home: bool,
+                     jeonse_ratio: float = 0.0,
+                     conversion_rate: float = T.RENT_CONVERSION_RATE) -> dict:
     """보유기간 H년·연상승률 growth 가정 시 모든 비용 차감 순익(원)과 비용 내역.
 
-    매도가 S = 매매가 × (1+growth)^H (복리). 순익 = 자본이득 − 모든비용.
+    매도가 S = 매매가 × (1+growth)^H (복리). 순익 = 자본이득 − 모든비용 + 거주가치.
     ROE 분모 = 투입 자기자본(equity + 취득부대비용).
+    jeonse_ratio>0이면 자가 거주효용(거주가치)을 순익에 더한다(실거주 관점). 0이면 순수 투자.
     """
     P, L, H = purchase_price, loan_amount, holding_years
     buy_tax = P * acquisition_tax_rate(P, is_first_home=is_first_home)
@@ -137,7 +153,9 @@ def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float
     holding_tax = annual_holding_tax(P) * H
     invested = equity + buy_tax + buy_fee
     opportunity = invested * opportunity_rate * H
-    net = gain - buy_tax - buy_fee - sell_fee - cgt - interest - holding_tax - opportunity
+    residence = residence_value_annual(P, jeonse_ratio, conversion_rate) * H
+    net = (gain - buy_tax - buy_fee - sell_fee - cgt - interest - holding_tax
+           - opportunity + residence)
     return {
         "net_profit": net,
         "sale_price": sale,
@@ -145,6 +163,7 @@ def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float
         "invested_equity": invested,
         "roe": net / invested if invested > 0 else 0.0,
         "first_home_exempt": _fully_exempt(sale, H, is_first_home=is_first_home),
+        "residence_value": residence,
         "costs": {
             "acquisition_tax": buy_tax,
             "buy_brokerage": buy_fee,
@@ -159,17 +178,21 @@ def total_net_profit(*, purchase_price: float, loan_amount: float, equity: float
 
 def breakeven_growth(*, purchase_price: float, loan_amount: float, equity: float,
                      effective_rate: float, holding_years: float,
-                     opportunity_rate: float, is_first_home: bool) -> float:
+                     opportunity_rate: float, is_first_home: bool,
+                     jeonse_ratio: float = 0.0,
+                     conversion_rate: float = T.RENT_CONVERSION_RATE) -> float:
     """순익=0 이 되는 연상승률(소수)을 이분탐색. 순익은 growth에 단조증가.
 
     양도세 12억 안분이 연속이므로(절벽 제거) 순익은 growth에 대해 단조증가가 유지된다 —
     이분탐색의 전제. 이 값을 넘는 연상승률이면 모든 비용을 메우고 남는다(=진짜 손익분기).
+    jeonse_ratio>0이면 거주가치 포함 손익분기(실거주 관점 — 더 낮아진다).
     """
     def net(g: float) -> float:
         return total_net_profit(
             purchase_price=purchase_price, loan_amount=loan_amount, equity=equity,
             effective_rate=effective_rate, growth=g, holding_years=holding_years,
-            opportunity_rate=opportunity_rate, is_first_home=is_first_home)["net_profit"]
+            opportunity_rate=opportunity_rate, is_first_home=is_first_home,
+            jeonse_ratio=jeonse_ratio, conversion_rate=conversion_rate)["net_profit"]
 
     lo, hi = -0.9, 2.0
     if net(lo) > 0:           # 폭락에도 이익(드묾) → 하한 반환

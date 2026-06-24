@@ -34,6 +34,8 @@ class AnalysisView(APIView):
         req = AnalyzeRequestSerializer(data=request.data)
         req.is_valid(raise_exception=True)
         d = req.validated_data
+        # 전세가율은 명시 입력(없으면 거주가치 0=투자관점). 분석 엔드포인트는 DB-free 유지 —
+        # UI가 /api/market_data/jeonse_ratio/ 로 먼저 조회해 값을 넘긴다(합성은 프론트가).
         result = get_service().analyze(
             purchase_price=d["purchase_price"],
             loan_amount=d["loan_amount"],
@@ -45,5 +47,6 @@ class AnalysisView(APIView):
             holding_years=d.get("holding_years", 2.0),
             opportunity_rate=d.get("opportunity_rate", 0.03),
             is_first_home=d.get("is_first_home", True),
+            jeonse_ratio=d.get("jeonse_ratio"),
         )
         return Response(AnalyzeResponseSerializer(asdict(result)).data)
