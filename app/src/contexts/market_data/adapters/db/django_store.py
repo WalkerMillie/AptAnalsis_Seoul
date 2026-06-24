@@ -6,6 +6,8 @@ JobStore 포트(has_running/save/upsert/rows)를 DB로 구현 — 도메인·app
 
 from __future__ import annotations
 
+from django.db import transaction
+
 from contexts.market_data.domain.trade import Trade
 from contexts.market_data.domain.jeonse_trade import JeonseTrade
 from contexts.market_data.adapters.db.models import (
@@ -33,28 +35,32 @@ class DjangoTradeStore:
 
     def _upsert_trades(self, rows: list) -> int:
         added = 0
-        for r in rows:
-            _, created = TradeRecord.objects.update_or_create(
-                complex_id=r.complex_id, contract_date=r.contract_date,
-                area_m2=r.area_m2, floor=r.floor,
-                defaults={"apt_name": r.apt_name, "region_code": r.region_code,
-                          "legal_dong": r.legal_dong, "price": r.price,
-                          "build_year": r.build_year})
-            if created:
-                added += 1
+        # 한 작업(구·월) 전체를 단일 트랜잭션으로 묶음 — 행마다 autocommit fsync 방지(대량 백필 가속).
+        # upsert 의미·created 카운트는 행별 update_or_create 그대로 보존.
+        with transaction.atomic():
+            for r in rows:
+                _, created = TradeRecord.objects.update_or_create(
+                    complex_id=r.complex_id, contract_date=r.contract_date,
+                    area_m2=r.area_m2, floor=r.floor,
+                    defaults={"apt_name": r.apt_name, "region_code": r.region_code,
+                              "legal_dong": r.legal_dong, "price": r.price,
+                              "build_year": r.build_year})
+                if created:
+                    added += 1
         return added                # '추가' 건수(planning §3.5). 재수집 동일행 → 0
 
     def _upsert_rents(self, rows: list) -> int:
         added = 0
-        for r in rows:
-            _, created = RentRecord.objects.update_or_create(
-                complex_id=r.complex_id, contract_date=r.contract_date,
-                area_m2=r.area_m2, floor=r.floor,
-                defaults={"apt_name": r.apt_name, "region_code": r.region_code,
-                          "legal_dong": r.legal_dong, "deposit": r.deposit,
-                          "build_year": r.build_year})
-            if created:
-                added += 1
+        with transaction.atomic():
+            for r in rows:
+                _, created = RentRecord.objects.update_or_create(
+                    complex_id=r.complex_id, contract_date=r.contract_date,
+                    area_m2=r.area_m2, floor=r.floor,
+                    defaults={"apt_name": r.apt_name, "region_code": r.region_code,
+                              "legal_dong": r.legal_dong, "deposit": r.deposit,
+                              "build_year": r.build_year})
+                if created:
+                    added += 1
         return added
 
     def rows(self, job_type: str) -> list:
