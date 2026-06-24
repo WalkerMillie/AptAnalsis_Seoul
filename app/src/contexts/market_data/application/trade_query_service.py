@@ -349,21 +349,23 @@ class TradeQueryService:
             g = _growth_from_points(pts)
             if g is None:
                 continue
-            # 대표 평형 = 윈도우 거래 최빈 밴드
-            band = Counter(_band(a) for _, a, _ in pts).most_common(1)[0][0]
-            sale_ppm2 = median([p for _, a, p in pts if _band(a) == band])
-            # 전세가율(대표 평형의 매매·전세 각 _MIN_RATIO_SEG건+)
+            # 대표 평형 = 성장 계산과 같은 밴드(양끝 표본 검증된 밴드)로 가격도 통일.
+            band = g["band_m2"]
+            # 가격은 '현재 시세' = 최근 구간(끝 1/3) median ㎡당가. 12개월 전체 median은
+            # 급등 단지를 옛 싼 거래로 끌어내려 실제 매수가와 괴리(상세=최근 실거래와 어긋남).
+            recent_ppm2 = g["last"]["ppm2"]
+            # 전세가율은 매매·전세를 같은 방식(12개월 median)으로 재야 왜곡이 없다(현재가 아님).
             jr = None
             rb = R.get(cid, {}).get(band)
             sale_seg = [p for _, a, p in pts if _band(a) == band]
             if rb and len(rb) >= _MIN_RATIO_SEG and len(sale_seg) >= _MIN_RATIO_SEG:
-                jr = round(median(rb) / sale_ppm2, 4)
+                jr = round(median(rb) / median(sale_seg), 4)
             build_year = Counter(e["byears"]).most_common(1)[0][0] if e["byears"] else 0
             out.append({
                 "complex_id": cid, "apt_name": e["name"],
                 "region_code": e["region"], "dong": e["dong"],
-                "price_ppm2": round(sale_ppm2),
-                "total_price": round(sale_ppm2 * band),
+                "price_ppm2": recent_ppm2,
+                "total_price": round(recent_ppm2 * band),
                 "area_m2": band, "build_year": build_year,
                 "growth": g["growth"], "jeonse_ratio": jr,
                 "confidence": g["confidence"], "window_trades": len(pts),
