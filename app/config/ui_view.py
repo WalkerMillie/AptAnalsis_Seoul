@@ -6,10 +6,21 @@
 
 from pathlib import Path
 
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 
-_INDEX = Path(__file__).resolve().parent.parent / "web_ui" / "index.html"
+_WEB_UI = Path(__file__).resolve().parent.parent / "web_ui"
+_INDEX = _WEB_UI / "index.html"
+_MOCKUPS = _WEB_UI / "mockups"
 
 
 def index(request):
     return HttpResponse(_INDEX.read_text(encoding="utf-8"))
+
+
+def mockups(request, name=""):
+    """디자인 시안 갤러리·개별 시안(web_ui/mockups/*.html) 정적 전달. 평가용 임시 라우트."""
+    target = (_MOCKUPS / (name or "index.html")).resolve()
+    # 디렉터리 이탈 방지 + .html만 허용.
+    if _MOCKUPS not in target.parents or target.suffix != ".html" or not target.is_file():
+        raise Http404("시안 없음")
+    return HttpResponse(target.read_text(encoding="utf-8"))

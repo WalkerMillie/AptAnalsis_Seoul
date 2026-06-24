@@ -9,3 +9,6 @@ db.sqlite3-wal
 db.sqlite3-shm
 
 # 주의: app/.env는 의도적으로 커밋함(무료 공공 MOLIT 키, data.go.kr에서 재발급 가능).
+
+# Playwright MCP 임시 산출물
+.playwright-mcp/

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디자인 시안 갤러리 · 서울 아파트 매매 의사결정</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+  :root{ --bg:#0d0f14; --card:#161922; --line:#262b38; --muted:#8b93a7; --txt:#e7eaf0; --accent:#6ea8fe; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--txt);
+        font-family:Pretendard,-apple-system,system-ui,sans-serif; }
+  header{ padding:38px 28px 22px; border-bottom:1px solid var(--line); }
+  h1{ margin:0 0 6px; font-size:24px; letter-spacing:-.02em; }
+  .sub{ color:var(--muted); font-size:14px; }
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; padding:18px 28px 0; }
+  .toolbar button{ border:1px solid var(--line); background:var(--card); color:var(--muted);
+        padding:8px 15px; border-radius:20px; font:inherit; font-size:13px; cursor:pointer; }
+  .toolbar button.on{ background:var(--accent); color:#08111f; border-color:var(--accent); font-weight:700; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:22px; padding:22px 28px 60px; }
+  .grid.solo{ grid-template-columns:1fr; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden;
+         display:flex; flex-direction:column; }
+  .card .bar{ display:flex; align-items:center; justify-content:space-between; padding:13px 16px;
+         border-bottom:1px solid var(--line); }
+  .card .nm{ font-size:15px; font-weight:700; }
+  .card .nm small{ display:block; color:var(--muted); font-weight:400; font-size:12px; margin-top:2px; }
+  .card a.open{ color:var(--accent); text-decoration:none; font-size:13px; border:1px solid var(--accent);
+         padding:5px 12px; border-radius:8px; }
+  .frame{ position:relative; width:100%; aspect-ratio:16/13; background:#fff; }
+  .grid.solo .frame{ aspect-ratio:16/9; }
+  .frame iframe{ position:absolute; top:0; left:0; width:200%; height:200%;
+         border:0; transform:scale(.5); transform-origin:0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎨 디자인 시안 갤러리</h1>
+  <div class="sub">서울 아파트 매매 의사결정 플랫폼 · 5가지 방향 · 같은 데이터(동아 단지), 다른 비주얼. 카드를 키우려면 “1개씩 보기”, 새 탭은 ↗ 열기.</div>
+</header>
+<div class="toolbar" id="bar"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+const MOCKS = [
+  {f:'01-fintech.html',  nm:'① 토스 핀테크',     d:'밝고 친근 · 큰 숫자 · 토스블루 · 라운드 카드'},
+  {f:'02-terminal.html', nm:'② 블룸버그 터미널', d:'다크 · 고밀도 · 모노스페이스 · 프로 데이터룸'},
+  {f:'03-editorial.html',nm:'③ 프리미엄 에디토리얼', d:'종이톤 · 세리프 · 리서치 리포트 조판'},
+  {f:'04-swiss.html',    nm:'④ 스위스 미니멀',   d:'그리드 · 뉴트럴+옐로우 · 정밀 타이포'},
+  {f:'05-luxury.html',   nm:'⑤ 강남 럭셔리 다크', d:'딥 다크 · 골드/에메랄드 · 절제된 럭셔리'},
+];
+const grid=document.getElementById('grid'), bar=document.getElementById('bar');
+function render(only){
+  grid.className='grid'+(only!=null?' solo':'');
+  grid.innerHTML='';
+  MOCKS.forEach((m,i)=>{
+    if(only!=null && only!==i) return;
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML=`<div class="bar"><div class="nm">${m.nm}<small>${m.d}</small></div>
+      <a class="open" href="${m.f}" target="_blank" rel="noopener">↗ 새 탭</a></div>
+      <div class="frame"><iframe src="${m.f}" loading="lazy"></iframe></div>`;
+    grid.appendChild(c);
+  });
+}
+function buildBar(){
+  const mk=(label,idx,on)=>{ const b=document.createElement('button'); b.textContent=label;
+    if(on)b.classList.add('on'); b.onclick=()=>{ [...bar.children].forEach(x=>x.classList.remove('on'));
+      b.classList.add('on'); render(idx); }; return b; };
+  bar.appendChild(mk('전체 보기',null,true));
+  MOCKS.forEach((m,i)=>bar.appendChild(mk(m.nm,i,false)));
+}
+buildBar(); render(null);
+</script>
+</body>
+</html>

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEOUL ASSET · 프리미엄 자산 컨설팅</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0c;
+    --bg-2:#101014;
+    --panel:#131318;
+    --panel-2:#17171d;
+    --line:rgba(198,167,94,0.18);
+    --line-soft:rgba(255,255,255,0.06);
+    --gold:#c6a75e;
+    --gold-bright:#e3c98a;
+    --gold-deep:#9a7f43;
+    --emerald:#3fae8e;
+    --emerald-bright:#62d3b0;
+    --text:#ece9e2;
+    --text-2:#a7a39b;
+    --text-3:#6f6c66;
+    --red:#c96f5e;
+    --serif:'Cormorant Garamond',serif;
+    --sans:'Noto Sans KR',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--text);
+    font-weight:300;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1100px 600px at 78% -8%, rgba(198,167,94,0.07), transparent 60%),
+      radial-gradient(900px 500px at 8% 105%, rgba(63,174,142,0.05), transparent 60%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
+    background-attachment:fixed;
+  }
+  ::selection{background:rgba(198,167,94,0.25);color:#fff}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 40px}
+
+  /* ---------- Header ---------- */
+  header{
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:blur(18px) saturate(120%);
+    background:rgba(10,10,12,0.72);
+  }
+  .topbar{display:flex;align-items:center;justify-content:space-between;height:84px}
+  .brand{display:flex;align-items:baseline;gap:14px}
+  .brand .mark{
+    font-family:var(--serif);font-size:30px;letter-spacing:3px;font-weight:600;
+    background:linear-gradient(180deg,var(--gold-bright),var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .brand .sub{font-size:10.5px;letter-spacing:5px;color:var(--text-3);text-transform:uppercase;font-weight:400}
+  nav{display:flex;gap:6px}
+  .tab{
+    font-family:var(--sans);font-size:13px;font-weight:400;letter-spacing:1px;
+    color:var(--text-2);background:none;border:none;cursor:pointer;
+    padding:10px 22px;border-radius:2px;position:relative;transition:.35s;
+  }
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--gold-bright)}
+  .tab.active::after{
+    content:"";position:absolute;left:22px;right:22px;bottom:-2px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  }
+  .acct{display:flex;align-items:center;gap:12px;font-size:11px;letter-spacing:1px;color:var(--text-3)}
+  .acct .dot{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald)}
+
+  /* ---------- View base ---------- */
+  .view{display:none;animation:fade .6s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  section{padding:46px 0}
+  .eyebrow{font-size:10.5px;letter-spacing:5px;text-transform:uppercase;color:var(--gold);font-weight:400;margin-bottom:14px}
+  h1{font-family:var(--serif);font-weight:500;font-size:54px;line-height:1.05;letter-spacing:.5px}
+  h2{font-family:var(--serif);font-weight:500;font-size:32px;letter-spacing:.3px}
+  .hairline{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:34px 0}
+
+  /* ---------- Selector ---------- */
+  .selector{display:flex;gap:0;align-items:stretch;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:linear-gradient(180deg,var(--panel),var(--panel-2));max-width:760px}
+  .sel-item{padding:16px 26px;border-right:1px solid var(--line-soft);min-width:130px}
+  .sel-item:last-child{border-right:none}
+  .sel-item .lbl{font-size:10px;letter-spacing:2px;color:var(--text-3);text-transform:uppercase;margin-bottom:5px}
+  .sel-item .val{font-size:16px;color:var(--text);font-weight:400}
+  .sel-item .val.active{color:var(--gold-bright)}
+  .sel-go{display:flex;align-items:center;padding:0 30px;background:linear-gradient(180deg,rgba(198,167,94,0.16),rgba(198,167,94,0.05));color:var(--gold-bright);font-size:13px;letter-spacing:1px;cursor:pointer;border-left:1px solid var(--line)}
+
+  /* ---------- Hero verdict ---------- */
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center;margin-top:38px}
+  .verdict-card{
+    border:1px solid var(--line);border-radius:6px;padding:42px 44px;
+    background:
+      radial-gradient(600px 300px at 100% 0,rgba(63,174,142,0.08),transparent 70%),
+      linear-gradient(180deg,var(--panel),#0e0e12);
+    position:relative;overflow:hidden;
+  }
+  .verdict-card::before{content:"";position:absolute;inset:0;border-radius:6px;padding:1px;background:linear-gradient(140deg,rgba(198,167,94,0.4),transparent 40%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+  .estate{display:flex;align-items:baseline;gap:16px;margin-bottom:6px}
+  .estate .name{font-family:var(--serif);font-size:44px;font-weight:600;color:var(--text)}
+  .estate .meta{font-size:13px;color:var(--text-2);letter-spacing:.5px}
+  .badge-row{display:flex;gap:10px;margin:8px 0 26px;flex-wrap:wrap}
+  .chip{font-size:11px;letter-spacing:1px;color:var(--text-2);border:1px solid var(--line-soft);border-radius:20px;padding:5px 13px;background:rgba(255,255,255,0.02)}
+  .verdict-tag{display:inline-flex;align-items:center;gap:10px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--emerald-bright);margin-bottom:14px}
+  .verdict-tag .pulse{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 12px var(--emerald)}
+  .verdict-main{font-family:var(--serif);font-size:38px;font-weight:500;line-height:1.2;letter-spacing:.3px}
+  .verdict-main em{font-style:normal;background:linear-gradient(180deg,var(--emerald-bright),var(--emerald));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .verdict-sub{color:var(--text-2);font-size:14px;margin-top:16px;max-width:440px}
+
+  .price-stack{text-align:right}
+  .price-stack .k{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--text-3);margin-bottom:10px}
+  .price-stack .big{font-family:var(--serif);font-size:72px;font-weight:600;line-height:1;background:linear-gradient(180deg,var(--gold-bright),var(--gold-deep));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .price-stack .unit{font-size:24px;color:var(--text-2);font-family:var(--sans);font-weight:300;margin-left:6px}
+  .price-stack .recent{font-size:13px;color:var(--text-2);margin-top:14px}
+  .price-stack .up{color:var(--emerald-bright);font-size:15px;margin-top:8px;letter-spacing:.5px}
+
+  /* ---------- Metric grid ---------- */
+  .mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line-soft);border:1px solid var(--line-soft);border-radius:6px;overflow:hidden}
+  .metric{background:linear-gradient(180deg,var(--panel),#0e0e12);padding:28px 26px}
+  .metric .k{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text-3);margin-bottom:12px}
+  .metric .v{font-family:var(--serif);font-size:34px;font-weight:600;color:var(--text);line-height:1}
+  .metric .v.gold{color:var(--gold-bright)}
+  .metric .v.em{color:var(--emerald-bright)}
+  .metric .note{font-size:12px;color:var(--text-2);margin-top:9px}
+
+  /* ---------- Chart ---------- */
+  .chart-card{border:1px solid var(--line);border-radius:6px;padding:34px 36px;background:linear-gradient(180deg,var(--panel),#0e0e12)}
+  .chart-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px}
+  .legend{display:flex;gap:22px;font-size:12px;color:var(--text-2)}
+  .legend span{display:inline-flex;align-items:center;gap:8px}
+  .legend i{width:18px;height:2px;display:inline-block}
+  .li-gold{background:linear-gradient(90deg,var(--gold-deep),var(--gold-bright))}
+  .li-em{background:linear-gradient(90deg,var(--emerald),var(--emerald-bright))}
+
+  /* ---------- Cost ledger ---------- */
+  .twocol{display:grid;grid-template-columns:1.2fr .8fr;gap:32px}
+  .ledger{border:1px solid var(--line-soft);border-radius:6px;background:linear-gradient(180deg,var(--panel),#0e0e12);overflow:hidden}
+  .ledger .row{display:flex;justify-content:space-between;padding:15px 28px;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .ledger .row:last-child{border-bottom:none}
+  .ledger .row .k{color:var(--text-2)}
+  .ledger .row .v{color:var(--text);font-variant-numeric:tabular-nums}
+  .ledger .row.free .v{color:var(--emerald-bright)}
+  .ledger .row.tot{background:rgba(198,167,94,0.05)}
+  .ledger .row.tot .k{color:var(--gold-bright);letter-spacing:1px}
+  .ledger .row.tot .v{color:var(--gold-bright);font-family:var(--serif);font-size:18px}
+
+  .profit-card{border:1px solid var(--line);border-radius:6px;padding:34px;background:radial-gradient(400px 240px at 100% 0,rgba(198,167,94,0.1),transparent 70%),linear-gradient(180deg,var(--panel),#0e0e12);display:flex;flex-direction:column;justify-content:center}
+  .profit-card .k{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--text-3);margin-bottom:12px}
+  .profit-card .v{font-family:var(--serif);font-size:48px;font-weight:600;color:var(--emerald-bright);line-height:1}
+  .profit-card .roi{font-size:14px;color:var(--text-2);margin-top:10px}
+  .profit-card .div{height:1px;background:var(--line-soft);margin:26px 0}
+  .profit-card .v.live{color:var(--gold-bright);font-size:40px}
+
+  /* ---------- Map view ---------- */
+  .map-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:start}
+  .map-svg-wrap{border:1px solid var(--line);border-radius:6px;padding:30px;background:linear-gradient(180deg,var(--panel),#0e0e12)}
+  .scale{display:flex;align-items:center;gap:10px;margin-top:22px;font-size:11px;color:var(--text-3);letter-spacing:1px}
+  .scale .bar{height:6px;flex:1;border-radius:3px;background:linear-gradient(90deg,#1a2620,#2c5e4d,#3fae8e,#c6a75e,#e3c98a)}
+  .rank-table{width:100%;border-collapse:collapse}
+  .rank-table th{text-align:left;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text-3);font-weight:400;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .rank-table td{padding:18px 16px;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .rank-table tr:hover td{background:rgba(198,167,94,0.04)}
+  .rank-table .num{font-family:var(--serif);font-size:22px;color:var(--gold);width:46px}
+  .rank-table .nm{color:var(--text);font-size:16px;font-family:var(--serif);font-weight:600}
+  .rank-table .rg{color:var(--text-3);font-size:12px;display:block;letter-spacing:.5px}
+  .rank-table .pct{text-align:right;color:var(--emerald-bright);font-family:var(--serif);font-size:22px;font-weight:600}
+  .spark{display:inline-block;vertical-align:middle}
+
+  /* ---------- Recommend view ---------- */
+  .rec-grid{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:start}
+  .filter-panel{border:1px solid var(--line);border-radius:6px;padding:30px 28px;background:linear-gradient(180deg,var(--panel),#0e0e12);position:sticky;top:108px}
+  .fgroup{margin-bottom:26px}
+  .fgroup .ft{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px}
+  .pill{font-size:12px;color:var(--text-2);border:1px solid var(--line-soft);border-radius:20px;padding:7px 14px;cursor:pointer;transition:.25s}
+  .pill:hover{border-color:var(--line)}
+  .pill.on{color:var(--gold-bright);border-color:var(--gold);background:rgba(198,167,94,0.08)}
+  .slider{margin-bottom:18px}
+  .slider .sl-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px}
+  .slider .sl-top .nm{color:var(--text-2)}
+  .slider .sl-top .wt{color:var(--gold-bright);font-variant-numeric:tabular-nums}
+  .track{height:3px;background:var(--line-soft);border-radius:3px;position:relative}
+  .track .fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold-deep),var(--gold-bright))}
+  .track .knob{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:var(--gold-bright);transform:translate(-50%,-50%);box-shadow:0 0 10px rgba(198,167,94,0.5);border:2px solid #0a0a0c}
+
+  .rec-list{display:flex;flex-direction:column;gap:1px;background:var(--line-soft);border:1px solid var(--line-soft);border-radius:6px;overflow:hidden}
+  .rec-head,.rec-row{display:grid;grid-template-columns:2fr 1fr 1.1fr .9fr .9fr 1fr .8fr;align-items:center;gap:14px;padding:18px 26px;background:linear-gradient(180deg,var(--panel),#0e0e12)}
+  .rec-head{font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text-3)}
+  .rec-row{transition:.25s;cursor:pointer}
+  .rec-row:hover{background:rgba(198,167,94,0.05)}
+  .rec-row .nm{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--text)}
+  .rec-row .rg{font-size:12px;color:var(--text-3)}
+  .rec-row .col{font-size:14px;color:var(--text-2);font-variant-numeric:tabular-nums}
+  .rec-row .col.up{color:var(--emerald-bright)}
+  .score{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+  .score .ring{width:42px;height:42px}
+  .score .num{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--gold-bright)}
+
+  footer{border-top:1px solid var(--line);padding:30px 0;margin-top:40px}
+  .foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-3);letter-spacing:1px}
+  .disclaimer{font-size:11px;color:var(--text-3);text-align:center;margin-top:16px;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap topbar">
+    <div class="brand">
+      <span class="mark">SEOUL ASSET</span>
+      <span class="sub">Private Real Estate Intelligence</span>
+    </div>
+    <nav>
+      <button class="tab active" data-v="v1">단지분석</button>
+      <button class="tab" data-v="v2">지도 · 랭킹</button>
+      <button class="tab" data-v="v3">맞춤추천</button>
+    </nav>
+    <div class="acct"><span class="dot"></span>국토부 실거래 연동</div>
+  </div>
+</header>
+
+<!-- ============ VIEW 1 : 단지분석 ============ -->
+<div class="view active" id="v1">
+  <div class="wrap">
+    <section style="padding-bottom:18px">
+      <div class="eyebrow">Estate Verdict · 매수 적정성 판정</div>
+      <div class="selector">
+        <div class="sel-item"><div class="lbl">자치구</div><div class="val">동대문구</div></div>
+        <div class="sel-item"><div class="lbl">법정동</div><div class="val">답십리동</div></div>
+        <div class="sel-item"><div class="lbl">단지</div><div class="val active">동아</div></div>
+        <div class="sel-item"><div class="lbl">평형</div><div class="val">25.7평 · 85㎡</div></div>
+        <div class="sel-go">분석 &nbsp;→</div>
+      </div>
+
+      <div class="hero">
+        <div class="verdict-card">
+          <div class="estate">
+            <span class="name">동아</span>
+            <span class="meta">답십리동 · 25.7평</span>
+          </div>
+          <div class="badge-row">
+            <span class="chip">🏗 1999년 준공 · 27년차</span>
+            <span class="chip">전세가율 62.9%</span>
+            <span class="chip">최근 실거래 2026 · 05 · 11층</span>
+          </div>
+          <div class="verdict-tag"><span class="pulse"></span>Verdict</div>
+          <div class="verdict-main">최근 추세라면 —<br><em>사도 이득이 남아요</em> ✅</div>
+          <div class="verdict-sub">본전 상승률 연 8.4%를 시장 상승률 +43.1%가 충분히 넘어섭니다. 이자만 따지면 연 4.1%면 유지되며, 7년 보유 기준 비용을 모두 차감해도 순익이 남습니다.</div>
+        </div>
+        <div class="price-stack">
+          <div class="k">현재 시세</div>
+          <div class="big">11.5<span class="unit">억</span></div>
+          <div class="recent">최근 실거래 &nbsp;11억 6,800만 &nbsp;·&nbsp; 전세 7억 2,000만</div>
+          <div class="up">▲ 12개월 +43.1%</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="wrap" style="padding:0"><div class="hairline"></div></div>
+
+    <section style="padding-top:6px">
+      <div class="mgrid">
+        <div class="metric"><div class="k">본전 상승률 (연)</div><div class="v gold">8.4<span style="font-size:18px">%</span></div><div class="note">이자만 따지면 4.1%</div></div>
+        <div class="metric"><div class="k">예상 순익 · 7년</div><div class="v em">+3.2<span style="font-size:18px">억</span></div><div class="note">투자수익률 78%</div></div>
+        <div class="metric"><div class="k">거주가치 포함 순익</div><div class="v em">+4.8<span style="font-size:18px">억</span></div><div class="note">자택 수익률 116%</div></div>
+        <div class="metric"><div class="k">전세가율</div><div class="v gold">62.9<span style="font-size:18px">%</span></div><div class="note">전세 7.2억 / 매매 11.5억</div></div>
+      </div>
+    </section>
+
+    <section style="padding-top:10px">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="eyebrow" style="margin-bottom:6px">12-Month Trend</div><h2>매매 · 전세 추세</h2></div>
+          <div class="legend">
+            <span><i class="li-gold"></i>매매가</span>
+            <span><i class="li-em"></i>전세가</span>
+          </div>
+        </div>
+        <svg viewBox="0 0 1000 320" width="100%" height="320" preserveAspectRatio="none" style="margin-top:18px">
+          <defs>
+            <linearGradient id="gGold" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#9a7f43"/><stop offset="1" stop-color="#e3c98a"/>
+            </linearGradient>
+            <linearGradient id="gEm" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#2c5e4d"/><stop offset="1" stop-color="#62d3b0"/>
+            </linearGradient>
+            <linearGradient id="fGold" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="rgba(198,167,94,0.28)"/><stop offset="1" stop-color="rgba(198,167,94,0)"/>
+            </linearGradient>
+            <linearGradient id="fEm" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="rgba(63,174,142,0.22)"/><stop offset="1" stop-color="rgba(63,174,142,0)"/>
+            </linearGradient>
+          </defs>
+          <!-- gridlines -->
+          <g stroke="rgba(255,255,255,0.05)" stroke-width="1">
+            <line x1="0" y1="40" x2="1000" y2="40"/>
+            <line x1="0" y1="120" x2="1000" y2="120"/>
+            <line x1="0" y1="200" x2="1000" y2="200"/>
+            <line x1="0" y1="280" x2="1000" y2="280"/>
+          </g>
+          <!-- 매매 area+line : 7.69 -> 11.5 (y scaled 4.5~12억 -> 290~30) -->
+          <path d="M0,233 L91,228 L182,215 L273,205 L364,190 L455,178 L546,160 L637,138 L728,120 L819,95 L910,70 L1000,52 L1000,300 L0,300 Z" fill="url(#fGold)"/>
+          <path d="M0,233 L91,228 L182,215 L273,205 L364,190 L455,178 L546,160 L637,138 L728,120 L819,95 L910,70 L1000,52" fill="none" stroke="url(#gGold)" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- 전세 area+line : 4.8 -> 7.2 -->
+          <path d="M0,283 L91,280 L182,276 L273,271 L364,266 L455,260 L546,253 L637,246 L728,237 L819,226 L910,214 L1000,205 L1000,300 L0,300 Z" fill="url(#fEm)"/>
+          <path d="M0,283 L91,280 L182,276 L273,271 L364,266 L455,260 L546,253 L637,246 L728,237 L819,226 L910,214 L1000,205" fill="none" stroke="url(#gEm)" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- endpoint dots -->
+          <circle cx="1000" cy="52" r="4.5" fill="#e3c98a"/>
+          <circle cx="1000" cy="205" r="4.5" fill="#62d3b0"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);letter-spacing:1px;margin-top:6px">
+          <span>2025 · 06 &nbsp; 7.69억</span><span>2025 · 12</span><span>2026 · 05 &nbsp; 11.5억</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top:10px">
+      <div class="twocol">
+        <div>
+          <div class="eyebrow">7-Year Cost Ledger · 보유 비용 명세</div>
+          <div class="ledger">
+            <div class="row"><span class="k">취득세</span><span class="v">3,795만</span></div>
+            <div class="row"><span class="k">중개보수</span><span class="v">1,012만</span></div>
+            <div class="row"><span class="k">대출이자 누적 (7년)</span><span class="v">1억 8,000만</span></div>
+            <div class="row"><span class="k">보유세 (7년)</span><span class="v">2,400만</span></div>
+            <div class="row free"><span class="k">양도세</span><span class="v">1주택 비과세</span></div>
+            <div class="row"><span class="k">자기자본 기회비용</span><span class="v">1억 2,000만</span></div>
+            <div class="row tot"><span class="k">총 보유 비용</span><span class="v">≈ 3억 7,207만</span></div>
+          </div>
+        </div>
+        <div class="profit-card">
+          <div class="k">예상 순익 · 7년 보유</div>
+          <div class="v">+3억 2,000만</div>
+          <div class="roi">투자수익률 &nbsp;<span style="color:var(--gold-bright)">78%</span></div>
+          <div class="div"></div>
+          <div class="k">자택 거주가치 포함 시</div>
+          <div class="v live">+4억 8,000만</div>
+          <div class="roi">자택 수익률 &nbsp;<span style="color:var(--gold-bright)">116%</span></div>
+        </div>
+      </div>
+      <div class="disclaimer">본 분석은 국토교통부 실거래가 및 최근 12개월 추세에 근거한 추정치이며 미래 수익을 보장하지 않습니다.</div>
+    </section>
+  </div>
+</div>
+
+<!-- ============ VIEW 2 : 지도·랭킹 ============ -->
+<div class="view" id="v2">
+  <div class="wrap">
+    <section>
+      <div class="eyebrow">Seoul Heatmap · 자치구별 12개월 상승률</div>
+      <h1 style="margin-bottom:30px">서울 상승률 지형도</h1>
+      <div class="map-grid">
+        <div class="map-svg-wrap">
+          <svg viewBox="0 0 520 460" width="100%">
+            <defs>
+              <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <!-- stylized choropleth grid of districts -->
+            <!-- each rect: fill by rate. high=gold, mid=emerald, low=dark -->
+            <g font-family="Noto Sans KR" font-size="11" font-weight="300">
+              <!-- 노원 6% -->
+              <rect x="330" y="20" width="150" height="80" rx="4" fill="#1c2a24" stroke="rgba(255,255,255,0.06)"/>
+              <text x="345" y="48" fill="#a7a39b">노원</text><text x="345" y="68" fill="#62d3b0" font-family="Cormorant Garamond" font-size="20">+6%</text>
+              <!-- 동대문 13% (selected) -->
+              <rect x="330" y="110" width="150" height="120" rx="4" fill="#2f6655" stroke="#c6a75e" stroke-width="1.5" filter="url(#glow)"/>
+              <text x="345" y="140" fill="#ece9e2">동대문</text><text x="345" y="168" fill="#e3c98a" font-family="Cormorant Garamond" font-size="26" font-weight="600">+13%</text>
+              <text x="345" y="190" fill="#c6a75e" font-size="9" letter-spacing="1">▸ 선택 지역</text>
+              <!-- 마포 11% -->
+              <rect x="20" y="110" width="140" height="120" rx="4" fill="#295a4b" stroke="rgba(255,255,255,0.06)"/>
+              <text x="34" y="140" fill="#a7a39b">마포</text><text x="34" y="168" fill="#62d3b0" font-family="Cormorant Garamond" font-size="24">+11%</text>
+              <!-- 서초 18% -->
+              <rect x="170" y="240" width="150" height="120" rx="4" fill="#7a6332" stroke="rgba(255,255,255,0.06)"/>
+              <text x="184" y="270" fill="#ece9e2">서초</text><text x="184" y="300" fill="#e3c98a" font-family="Cormorant Garamond" font-size="28" font-weight="600">+18%</text>
+              <!-- 강남 15% -->
+              <rect x="330" y="240" width="150" height="120" rx="4" fill="#6a572f" stroke="rgba(255,255,255,0.06)"/>
+              <text x="344" y="270" fill="#ece9e2">강남</text><text x="344" y="300" fill="#e3c98a" font-family="Cormorant Garamond" font-size="26" font-weight="600">+15%</text>
+              <!-- 송파 14% -->
+              <rect x="330" y="370" width="150" height="75" rx="4" fill="#5e5a36" stroke="rgba(255,255,255,0.06)"/>
+              <text x="344" y="398" fill="#a7a39b">송파</text><text x="344" y="420" fill="#e3c98a" font-family="Cormorant Garamond" font-size="22">+14%</text>
+              <!-- 중심부 filler -->
+              <rect x="20" y="240" width="140" height="205" rx="4" fill="#181820" stroke="rgba(255,255,255,0.04)"/>
+              <text x="34" y="270" fill="#6f6c66">기타 권역</text><text x="34" y="296" fill="#6f6c66" font-family="Cormorant Garamond" font-size="20">+4~9%</text>
+              <rect x="20" y="20" width="290" height="80" rx="4" fill="#141419" stroke="rgba(255,255,255,0.04)"/>
+              <text x="34" y="48" fill="#6f6c66">강북 권역</text><text x="34" y="68" fill="#6f6c66" font-family="Cormorant Garamond" font-size="18">평균 +7%</text>
+            </g>
+          </svg>
+          <div class="scale">
+            <span>+5%</span><div class="bar"></div><span>+20%</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="eyebrow" style="margin-bottom:18px">Top Performers · 단지 상승률 랭킹</div>
+          <table class="rank-table">
+            <thead><tr><th>순위</th><th>단지 · 지역</th><th style="text-align:right">12M 추이</th><th style="text-align:right">상승률</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="num">01</td>
+                <td><span class="nm">반포자이</span><span class="rg">서초구</span></td>
+                <td style="text-align:right"><svg class="spark" width="80" height="26"><path d="M2,22 L20,18 L38,12 L56,8 L78,3" fill="none" stroke="#e3c98a" stroke-width="2"/></svg></td>
+                <td class="pct">+51%</td>
+              </tr>
+              <tr style="background:rgba(198,167,94,0.05)">
+                <td class="num">02</td>
+                <td><span class="nm" style="color:var(--gold-bright)">동아</span><span class="rg">동대문구 · 선택</span></td>
+                <td style="text-align:right"><svg class="spark" width="80" height="26"><path d="M2,22 L20,19 L38,14 L56,9 L78,4" fill="none" stroke="#e3c98a" stroke-width="2"/></svg></td>
+                <td class="pct">+43%</td>
+              </tr>
+              <tr>
+                <td class="num">03</td>
+                <td><span class="nm">헬리오시티</span><span class="rg">송파구</span></td>
+                <td style="text-align:right"><svg class="spark" width="80" height="26"><path d="M2,22 L20,20 L38,16 L56,11 L78,6" fill="none" stroke="#62d3b0" stroke-width="2"/></svg></td>
+                <td class="pct">+38%</td>
+              </tr>
+              <tr>
+                <td class="num">04</td>
+                <td><span class="nm">래미안대치팰리스</span><span class="rg">강남구</span></td>
+                <td style="text-align:right"><svg class="spark" width="80" height="26"><path d="M2,22 L20,20 L38,17 L56,12 L78,7" fill="none" stroke="#62d3b0" stroke-width="2"/></svg></td>
+                <td class="pct">+35%</td>
+              </tr>
+              <tr>
+                <td class="num">05</td>
+                <td><span class="nm">마포래미안푸르지오</span><span class="rg">마포구</span></td>
+                <td style="text-align:right"><svg class="spark" width="80" height="26"><path d="M2,22 L20,21 L38,18 L56,14 L78,9" fill="none" stroke="#62d3b0" stroke-width="2"/></svg></td>
+                <td class="pct">+31%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ============ VIEW 3 : 맞춤추천 ============ -->
+<div class="view" id="v3">
+  <div class="wrap">
+    <section>
+      <div class="eyebrow">Tailored Selection · 맞춤 단지 추천</div>
+      <h1 style="margin-bottom:30px">당신의 기준으로,<br>최적의 단지를 선별합니다</h1>
+      <div class="rec-grid">
+        <div class="filter-panel">
+          <div class="fgroup">
+            <div class="ft">가격대</div>
+            <div class="pill-row">
+              <span class="pill">~10억</span>
+              <span class="pill on">10–15억</span>
+              <span class="pill">15–20억</span>
+              <span class="pill">20억+</span>
+            </div>
+          </div>
+          <div class="fgroup">
+            <div class="ft">평형대</div>
+            <div class="pill-row">
+              <span class="pill">~20평</span>
+              <span class="pill on">25평형</span>
+              <span class="pill">33평형</span>
+              <span class="pill">40평+</span>
+            </div>
+          </div>
+          <div class="fgroup">
+            <div class="ft">분석 기간</div>
+            <div class="pill-row">
+              <span class="pill">6개월</span>
+              <span class="pill on">12개월</span>
+              <span class="pill">36개월</span>
+            </div>
+          </div>
+          <div class="hairline" style="margin:24px 0"></div>
+          <div class="ft" style="margin-bottom:18px">지표 가중치</div>
+          <div class="slider"><div class="sl-top"><span class="nm">가성비</span><span class="wt">85</span></div><div class="track"><div class="fill" style="width:85%"></div><div class="knob" style="left:85%"></div></div></div>
+          <div class="slider"><div class="sl-top"><span class="nm">평수</span><span class="wt">40</span></div><div class="track"><div class="fill" style="width:40%"></div><div class="knob" style="left:40%"></div></div></div>
+          <div class="slider"><div class="sl-top"><span class="nm">건축년도</span><span class="wt">55</span></div><div class="track"><div class="fill" style="width:55%"></div><div class="knob" style="left:55%"></div></div></div>
+          <div class="slider"><div class="sl-top"><span class="nm">상승률</span><span class="wt">90</span></div><div class="track"><div class="fill" style="width:90%"></div><div class="knob" style="left:90%"></div></div></div>
+          <div class="slider"><div class="sl-top"><span class="nm">전세가율</span><span class="wt">70</span></div><div class="track"><div class="fill" style="width:70%"></div><div class="knob" style="left:70%"></div></div></div>
+          <div class="slider"><div class="sl-top"><span class="nm">신뢰도</span><span class="wt">60</span></div><div class="track"><div class="fill" style="width:60%"></div><div class="knob" style="left:60%"></div></div></div>
+        </div>
+
+        <div class="rec-list">
+          <div class="rec-head">
+            <span>단지</span><span>지역</span><span>현재가</span><span>건축</span><span>12M</span><span>전세가율</span><span style="text-align:right">점수</span>
+          </div>
+          <!-- 1 -->
+          <div class="rec-row">
+            <div><div class="nm">동아</div></div>
+            <span class="col">동대문</span><span class="col">11.5억</span><span class="col">1999</span><span class="col up">+43.1%</span><span class="col">62.9%</span>
+            <div class="score"><span class="num">92</span></div>
+          </div>
+          <div class="rec-row">
+            <div><div class="nm">헬리오시티</div></div>
+            <span class="col">송파</span><span class="col">18.2억</span><span class="col">2018</span><span class="col up">+38%</span><span class="col">55%</span>
+            <div class="score"><span class="num">88</span></div>
+          </div>
+          <div class="rec-row">
+            <div><div class="nm">마포래미안푸르지오</div></div>
+            <span class="col">마포</span><span class="col">14.1억</span><span class="col">2014</span><span class="col up">+31%</span><span class="col">58%</span>
+            <div class="score"><span class="num">85</span></div>
+          </div>
+          <div class="rec-row">
+            <div><div class="nm">래미안대치팰리스</div></div>
+            <span class="col">강남</span><span class="col">26.8억</span><span class="col">2015</span><span class="col up">+35%</span><span class="col">49%</span>
+            <div class="score"><span class="num">83</span></div>
+          </div>
+          <div class="rec-row">
+            <div><div class="nm">반포자이</div></div>
+            <span class="col">서초</span><span class="col">31.5억</span><span class="col">2008</span><span class="col up">+51%</span><span class="col">47%</span>
+            <div class="score"><span class="num">81</span></div>
+          </div>
+          <div class="rec-row">
+            <div><div class="nm">상계주공7단지</div></div>
+            <span class="col">노원</span><span class="col">8.4억</span><span class="col">1988</span><span class="col up">+6%</span><span class="col">61%</span>
+            <div class="score"><span class="num">74</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap foot">
+    <span>SEOUL ASSET · Private Real Estate Intelligence</span>
+    <span>데이터 출처 · 국토교통부 실거래가 · MOLIT 전월세 API</span>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click',function(){
+      document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
+      document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active')});
+      t.classList.add('active');
+      document.getElementById(t.dataset.v).classList.add('active');
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+  // filter pill toggles (single-select per group)
+  document.querySelectorAll('.fgroup .pill-row').forEach(function(row){
+    row.querySelectorAll('.pill').forEach(function(p){
+      p.addEventListener('click',function(){
+        row.querySelectorAll('.pill').forEach(function(x){x.classList.remove('on')});
+        p.classList.add('on');
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>서울 아파트 매매 의사결정 · 핀테크 시안</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root{
+    --blue:#3182F6; --blue-dark:#1B64DA; --blue-soft:#E8F1FE; --blue-soft2:#F1F6FE;
+    --green:#0FA968; --green-soft:#E5F8EF;
+    --red:#F04452; --red-soft:#FDECEE;
+    --ink:#0D1421; --ink2:#333D4B; --gray:#6B7684; --gray2:#8B95A1; --line:#EDF0F3;
+    --bg:#F2F4F6; --card:#FFFFFF; --amber:#F59E0B;
+    --shadow-sm:0 1px 2px rgba(20,30,45,.04), 0 4px 12px rgba(20,30,45,.05);
+    --shadow-md:0 4px 16px rgba(20,30,45,.07), 0 12px 32px rgba(20,30,45,.06);
+    --shadow-lg:0 8px 28px rgba(49,130,246,.16), 0 18px 48px rgba(20,30,45,.10);
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.5;
+    -webkit-font-smoothing:antialiased; letter-spacing:-.01em;
+  }
+  .num{font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+  .pos{color:var(--blue)} .gain{color:var(--green)} .neg{color:var(--red)}
+  .mut{color:var(--gray)}
+  a{color:inherit;text-decoration:none}
+
+  /* ===== Top bar ===== */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);
+    backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line);}
+  .topbar-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:20px}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px}
+  .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--blue),#5AA0FF);
+    display:grid;place-items:center;color:#fff;font-size:15px;box-shadow:0 4px 10px rgba(49,130,246,.35)}
+  .logo small{font-size:11px;font-weight:600;color:var(--gray2);display:block;letter-spacing:0}
+  .tabs{display:flex;gap:4px;margin-left:8px}
+  .tab{padding:9px 16px;border-radius:11px;font-size:14.5px;font-weight:600;color:var(--gray);
+    cursor:pointer;border:none;background:none;transition:.15s;display:flex;align-items:center;gap:7px}
+  .tab:hover{color:var(--ink2);background:var(--blue-soft2)}
+  .tab.active{color:var(--blue);background:var(--blue-soft)}
+  .topbar .spacer{flex:1}
+  .pill{font-size:12px;font-weight:600;color:var(--gray);background:#fff;border:1px solid var(--line);
+    padding:7px 13px;border-radius:999px;display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 24px 80px}
+  .view{display:none;animation:fade .35s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ===== Cards ===== */
+  .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow-sm);border:1px solid #F1F3F6}
+  .card-pad{padding:22px 24px}
+  .grid{display:grid;gap:16px}
+  .sec-title{font-size:13px;font-weight:700;color:var(--gray2);letter-spacing:.02em;margin-bottom:12px;
+    display:flex;align-items:center;gap:7px;text-transform:none}
+
+  /* ===== Selector row ===== */
+  .selectors{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+  .sel{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
+    border-radius:13px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;
+    box-shadow:var(--shadow-sm);transition:.15s}
+  .sel:hover{border-color:#D6DEE8;box-shadow:var(--shadow-md);transform:translateY(-1px)}
+  .sel .lbl{font-size:11px;color:var(--gray2);font-weight:600}
+  .sel .val{color:var(--ink)}
+  .sel .chev{color:var(--gray2);font-size:11px}
+  .sel.primary{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:var(--shadow-lg)}
+  .sel.primary .val,.sel.primary .lbl,.sel.primary .chev{color:#fff}
+  .arrow{color:var(--gray2);font-size:13px}
+
+  /* ===== Hero verdict ===== */
+  .hero{position:relative;overflow:hidden;border-radius:24px;padding:0;margin-bottom:18px;
+    background:linear-gradient(135deg,#2B7CF6 0%,#3182F6 45%,#4C8DF8 100%);
+    box-shadow:0 14px 44px rgba(49,130,246,.34)}
+  .hero::after{content:"";position:absolute;right:-70px;top:-90px;width:300px;height:300px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.22),transparent 65%)}
+  .hero::before{content:"";position:absolute;left:-50px;bottom:-110px;width:260px;height:260px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.12),transparent 65%)}
+  .hero-in{position:relative;z-index:2;padding:30px 34px 34px;color:#fff}
+  .hero-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);
+    padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:700;backdrop-filter:blur(4px)}
+  .hero h1{font-size:34px;font-weight:800;margin:16px 0 6px;line-height:1.22;letter-spacing:-.03em}
+  .hero h1 .em{background:rgba(255,255,255,.22);padding:0 8px;border-radius:8px}
+  .hero-sub{font-size:15px;color:rgba(255,255,255,.9);font-weight:500}
+  .hero-stats{display:flex;gap:0;margin-top:24px;background:rgba(255,255,255,.13);border-radius:16px;
+    padding:4px;backdrop-filter:blur(6px)}
+  .hstat{flex:1;padding:14px 18px;text-align:center;position:relative}
+  .hstat+.hstat::before{content:"";position:absolute;left:0;top:22%;height:56%;width:1px;background:rgba(255,255,255,.22)}
+  .hstat .k{font-size:12px;color:rgba(255,255,255,.82);font-weight:600;margin-bottom:6px}
+  .hstat .v{font-size:25px;font-weight:800}
+  .hstat .v small{font-size:14px;font-weight:700;opacity:.85}
+
+  /* property head */
+  .prop-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .prop-head h2{font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .prop-head .meta{font-size:13.5px;color:var(--gray);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;background:var(--blue-soft);color:var(--blue-dark)}
+  .badge.gray{background:#F2F4F6;color:var(--gray)}
+  .like{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;
+    font-size:18px;cursor:pointer;transition:.15s}
+  .like:hover{border-color:var(--red);background:var(--red-soft);transform:scale(1.05)}
+
+  /* big price strip */
+  .pricestrip{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .pcell{background:#fff;border:1px solid #F1F3F6;border-radius:16px;padding:18px 20px;box-shadow:var(--shadow-sm);transition:.15s}
+  .pcell:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+  .pcell .k{font-size:12.5px;color:var(--gray);font-weight:600;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+  .pcell .v{font-size:30px;font-weight:800;letter-spacing:-.03em}
+  .pcell .v small{font-size:16px;font-weight:700}
+  .pcell .sub{font-size:12.5px;color:var(--gray2);margin-top:6px;font-weight:500}
+  .chg{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:800;padding:3px 9px;border-radius:8px}
+  .chg.up{background:var(--blue-soft);color:var(--blue)}
+  .chg.up.g{background:var(--green-soft);color:var(--green)}
+
+  /* two col */
+  .twocol{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:18px}
+  @media(max-width:880px){.twocol{grid-template-columns:1fr}.pricestrip{grid-template-columns:1fr}.hero-stats{flex-wrap:wrap}}
+
+  /* charts */
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .chart-head .t{font-size:15px;font-weight:700}
+  .chart-head .r{font-size:13px;font-weight:700}
+  .legend{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--gray)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .lg-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+
+  /* profit panel */
+  .profit{background:linear-gradient(160deg,#F1F8FF,#FFFFFF 60%);border:1px solid #E3EEFC}
+  .profit .big{font-size:42px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .profit .roi{font-size:15px;font-weight:700;color:var(--blue);margin-top:8px}
+  .barrow{margin-top:18px}
+  .barrow .lbl{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:7px}
+  .track{height:11px;border-radius:99px;background:#EAF0F7;overflow:hidden;display:flex}
+  .track .fill{height:100%;border-radius:99px}
+  .selfbox{margin-top:16px;padding:14px 16px;background:var(--green-soft);border-radius:13px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .selfbox .t{font-size:13px;font-weight:700;color:#0A7A4B}
+  .selfbox .v{font-size:20px;font-weight:800;color:var(--green)}
+
+  /* breakeven */
+  .be{display:flex;align-items:center;gap:18px}
+  .gauge{position:relative;width:120px;height:120px;flex:none}
+  .gauge .lab{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+  .gauge .lab .n{font-size:26px;font-weight:800}
+  .gauge .lab .u{font-size:11px;color:var(--gray);font-weight:600}
+  .be .desc{font-size:13.5px;color:var(--ink2);line-height:1.6}
+  .be .desc b{color:var(--blue)}
+
+  /* cost table */
+  .costs{margin-top:4px}
+  .crow{display:flex;justify-content:space-between;align-items:center;padding:13px 2px;border-bottom:1px solid var(--line);font-size:14px}
+  .crow:last-child{border-bottom:none}
+  .crow .k{color:var(--ink2);font-weight:600;display:flex;align-items:center;gap:9px}
+  .crow .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:14px;background:var(--blue-soft2)}
+  .crow .v{font-weight:700}
+  .crow.total{margin-top:6px;padding-top:15px;border-top:2px solid #E8EDF3;border-bottom:none}
+  .crow.total .k{font-size:15px;font-weight:800}
+  .crow.total .v{font-size:18px;font-weight:800;color:var(--red)}
+  .crow .free{font-size:11px;font-weight:700;color:var(--green);background:var(--green-soft);padding:3px 8px;border-radius:7px;margin-left:8px}
+
+  .infonote{font-size:12.5px;color:var(--gray2);margin-top:14px;line-height:1.6;padding:12px 14px;background:#F8FAFC;border-radius:11px;border:1px dashed #E1E7EE}
+
+  /* ===== Map / ranking ===== */
+  .maprow{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:880px){.maprow{grid-template-columns:1fr}}
+  .mapgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:6px}
+  .gu{border-radius:13px;padding:13px 8px 11px;text-align:center;color:#fff;font-weight:700;cursor:pointer;transition:.15s;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  .gu:hover{transform:translateY(-3px) scale(1.03);box-shadow:var(--shadow-md)}
+  .gu .nm{font-size:13px}
+  .gu .pc{font-size:15px;font-weight:800;margin-top:3px}
+  .scale{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--gray);margin-top:14px}
+  .scale .bar{flex:1;height:9px;border-radius:99px;background:linear-gradient(90deg,#E8F1FE,#7FB0F7,#3182F6,#1B64DA)}
+
+  table{width:100%;border-collapse:collapse}
+  thead th{font-size:12px;color:var(--gray2);font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  thead th.r,tbody td.r{text-align:right}
+  tbody td{padding:14px 12px;border-bottom:1px solid var(--line);font-size:14px;font-weight:600}
+  tbody tr{transition:.12s;cursor:pointer}
+  tbody tr:hover{background:var(--blue-soft2)}
+  tbody tr:last-child td{border-bottom:none}
+  .rk{width:26px;height:26px;border-radius:8px;display:inline-grid;place-items:center;font-size:13px;font-weight:800;
+    background:#F2F4F6;color:var(--gray)}
+  .rk.g1{background:linear-gradient(135deg,#FFD66B,#F5A623);color:#fff}
+  .rk.g2{background:linear-gradient(135deg,#D7DEE6,#AEB9C5);color:#fff}
+  .rk.g3{background:linear-gradient(135deg,#E7B98C,#CD8E55);color:#fff}
+  .nmcell{display:flex;align-items:center;gap:10px}
+  .scorepill{font-weight:800;padding:5px 11px;border-radius:9px;font-size:13.5px;background:var(--blue-soft);color:var(--blue-dark)}
+  .minibar{display:inline-block;width:46px;height:7px;border-radius:99px;background:#EAF0F7;vertical-align:middle;margin-left:8px;overflow:hidden;position:relative}
+  .minibar i{position:absolute;left:0;top:0;height:100%;border-radius:99px;background:var(--blue)}
+
+  /* ===== Recommend ===== */
+  .reclayout{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
+  @media(max-width:880px){.reclayout{grid-template-columns:1fr}}
+  .filtcard{position:sticky;top:84px}
+  .fgroup{margin-bottom:20px}
+  .fgroup>.flbl{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--ink2)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:10px;border:1px solid var(--line);
+    background:#fff;cursor:pointer;color:var(--gray);transition:.12s}
+  .chip:hover{border-color:#C9D4E0}
+  .chip.on{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:0 4px 10px rgba(49,130,246,.28)}
+  .wrow{margin-bottom:15px}
+  .wrow .wt{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:7px}
+  .wrow .wt .wv{color:var(--blue);font-weight:800}
+  .rng{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;cursor:pointer}
+  .rng::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;
+    border:none;box-shadow:0 2px 6px rgba(20,30,45,.25),0 0 0 4px var(--blue);cursor:pointer;transition:.1s}
+  .rng::-webkit-slider-thumb:hover{transform:scale(1.12)}
+  .applybtn{width:100%;padding:14px;border:none;border-radius:13px;background:var(--blue);color:#fff;
+    font-size:15px;font-weight:700;cursor:pointer;box-shadow:var(--shadow-lg);transition:.15s}
+  .applybtn:hover{background:var(--blue-dark);transform:translateY(-1px)}
+
+  .reccard{display:flex;align-items:center;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line);transition:.12s;cursor:pointer}
+  .reccard:hover{background:var(--blue-soft2)}
+  .reccard:last-child{border-bottom:none}
+  .recscore{flex:none;width:62px;height:62px;border-radius:16px;display:grid;place-content:center;text-align:center;
+    background:linear-gradient(135deg,var(--blue),#5AA0FF);color:#fff}
+  .recscore .n{font-size:22px;font-weight:800;line-height:1}
+  .recscore .u{font-size:10px;font-weight:600;opacity:.85}
+  .recscore.s2{background:linear-gradient(135deg,#0FA968,#43C58B)}
+  .recscore.s3{background:linear-gradient(135deg,#7C8CF8,#9AA8FF)}
+  .recscore.s4{background:linear-gradient(135deg,#8B95A1,#AEB9C5)}
+  .recmain{flex:1;min-width:0}
+  .recmain .nm{font-size:16.5px;font-weight:800}
+  .recmain .nm .loc{font-size:12.5px;color:var(--gray);font-weight:600;margin-left:8px}
+  .rectags{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .rtag{font-size:11.5px;font-weight:600;color:var(--ink2);background:#F2F4F6;padding:4px 9px;border-radius:7px}
+  .rtag b{color:var(--blue);font-weight:800}
+  .recprice{text-align:right;flex:none}
+  .recprice .v{font-size:19px;font-weight:800}
+  .recprice .u{font-size:13px}
+  .recprice .ch{font-size:12.5px;font-weight:800;color:var(--blue);margin-top:3px}
+
+  .foot{text-align:center;font-size:12px;color:var(--gray2);margin-top:34px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="logo">
+      <span class="mark">집</span>
+      <span>집값나침반<small>서울 아파트 매매 의사결정</small></span>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-v="analyze">🔍 단지분석</button>
+      <button class="tab" data-v="map">🗺 지도·랭킹</button>
+      <button class="tab" data-v="rec">◎ 맞춤추천</button>
+    </nav>
+    <span class="spacer"></span>
+    <span class="pill"><span class="dot"></span>국토부 실거래가 · 2026.06 기준</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ VIEW 1: 단지분석 ============ -->
+  <section class="view active" id="analyze">
+
+    <div class="selectors">
+      <div class="sel"><span class="lbl">구</span><span class="val">동대문구</span><span class="chev">▾</span></div>
+      <span class="arrow">›</span>
+      <div class="sel"><span class="lbl">동</span><span class="val">답십리동</span><span class="chev">▾</span></div>
+      <span class="arrow">›</span>
+      <div class="sel primary"><span class="lbl">단지</span><span class="val">동아</span><span class="chev">▾</span></div>
+      <div class="sel"><span class="lbl">평형</span><span class="val">25.7평 (85㎡)</span><span class="chev">▾</span></div>
+      <span class="spacer" style="flex:1"></span>
+    </div>
+
+    <!-- hero verdict -->
+    <div class="hero">
+      <div class="hero-in">
+        <span class="hero-tag">⚡ AI 종합 판정 · 7년 보유 시나리오</span>
+        <h1>최근 추세라면 —<br><span class="em">사도 이득이 남아요</span> ✅</h1>
+        <p class="hero-sub">매입가가 본전 상승률(연 8.4%)을 넘는 추세예요. 이자만 따지면 연 4.1%면 본전입니다.</p>
+        <div class="hero-stats">
+          <div class="hstat"><div class="k">예상 순익 (7년)</div><div class="v num">+3억 2천<small>만</small></div></div>
+          <div class="hstat"><div class="k">투자수익률</div><div class="v num">78<small>%</small></div></div>
+          <div class="hstat"><div class="k">본전 상승률(연)</div><div class="v num">8.4<small>%</small></div></div>
+          <div class="hstat"><div class="k">최근 12개월</div><div class="v num">+43.1<small>%</small></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- property head -->
+    <div class="card card-pad" style="margin-bottom:18px">
+      <div class="prop-head">
+        <div>
+          <h2>답십리동 동아</h2>
+          <div class="meta">
+            <span class="badge">동대문구</span>
+            <span class="badge gray">🏗 1999년 준공 · 27년차</span>
+            <span>전용 85㎡ · 25.7평</span>
+            <span>·</span>
+            <span>최근 실거래 11억 6,800만 (2026-05, 11층)</span>
+          </div>
+        </div>
+        <div class="like" title="관심단지 추가">🤍</div>
+      </div>
+
+      <div class="pricestrip">
+        <div class="pcell">
+          <div class="k">💰 현재 매매 시세</div>
+          <div class="v num">11.5<small>억</small></div>
+          <div class="sub"><span class="chg up">▲ +43.1% <span style="font-weight:600">12개월</span></span></div>
+        </div>
+        <div class="pcell">
+          <div class="k">🏠 전세 시세</div>
+          <div class="v num">7.2<small>억</small></div>
+          <div class="sub"><span class="chg up g">전세가율 62.9%</span> <span class="mut" style="margin-left:6px">전세 4.8 → 7.2억</span></div>
+        </div>
+        <div class="pcell">
+          <div class="k">📈 최근 실거래</div>
+          <div class="v num">11.68<small>억</small></div>
+          <div class="sub">2026년 5월 · 11층 · 시세 대비 <span class="pos" style="font-weight:700">+1.6%</span></div>
+        </div>
+      </div>
+
+      <!-- charts -->
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:18px">
+        <div>
+          <div class="chart-head">
+            <span class="t">매매 시세 추이</span>
+            <span class="r pos num">7.69억 → 11.5억 ▲</span>
+          </div>
+          <svg viewBox="0 0 400 150" width="100%" height="150" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="gSale" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3182F6" stop-opacity=".28"/>
+                <stop offset="100%" stop-color="#3182F6" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="38" x2="400" y2="38" stroke="#EDF0F3"/>
+            <line x1="0" y1="76" x2="400" y2="76" stroke="#EDF0F3"/>
+            <line x1="0" y1="114" x2="400" y2="114" stroke="#EDF0F3"/>
+            <path d="M0,118 L36,112 L73,108 L109,99 L145,96 L182,82 L218,74 L255,60 L291,46 L327,34 L364,26 L400,18 L400,150 L0,150 Z" fill="url(#gSale)"/>
+            <path d="M0,118 L36,112 L73,108 L109,99 L145,96 L182,82 L218,74 L255,60 L291,46 L327,34 L364,26 L400,18" fill="none" stroke="#3182F6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="400" cy="18" r="5" fill="#3182F6" stroke="#fff" stroke-width="2.5"/>
+          </svg>
+          <div class="legend">
+            <span><span class="lg-dot" style="background:#3182F6"></span>최근 12개월</span>
+            <span class="mut">11.5억 현재 시세</span>
+          </div>
+        </div>
+        <div>
+          <div class="chart-head">
+            <span class="t">전세 시세 추이</span>
+            <span class="r gain num">4.8억 → 7.2억 ▲</span>
+          </div>
+          <svg viewBox="0 0 400 150" width="100%" height="150" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="gJeon" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0FA968" stop-opacity=".26"/>
+                <stop offset="100%" stop-color="#0FA968" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="38" x2="400" y2="38" stroke="#EDF0F3"/>
+            <line x1="0" y1="76" x2="400" y2="76" stroke="#EDF0F3"/>
+            <line x1="0" y1="114" x2="400" y2="114" stroke="#EDF0F3"/>
+            <path d="M0,116 L36,113 L73,107 L109,103 L145,95 L182,90 L218,82 L255,76 L291,68 L327,60 L364,52 L400,46 L400,150 L0,150 Z" fill="url(#gJeon)"/>
+            <path d="M0,116 L36,113 L73,107 L109,103 L145,95 L182,90 L218,82 L255,76 L291,68 L327,60 L364,52 L400,46" fill="none" stroke="#0FA968" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="400" cy="46" r="5" fill="#0FA968" stroke="#fff" stroke-width="2.5"/>
+          </svg>
+          <div class="legend">
+            <span><span class="lg-dot" style="background:#0FA968"></span>최근 12개월</span>
+            <span class="mut">전세가율 62.9% (안정권)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- profit + breakeven -->
+    <div class="twocol">
+      <div class="card card-pad profit">
+        <div class="sec-title">💎 7년 보유 시 예상 순익</div>
+        <div class="big num pos">+3억 2,000만<small style="font-size:20px"> 원</small></div>
+        <div class="roi">투자수익률 78% · 자기자본 대비</div>
+
+        <div class="barrow">
+          <div class="lbl"><span>예상 매도가 (7년 후)</span><span class="num pos">약 16.8억</span></div>
+          <div class="track">
+            <span class="fill" style="width:68%;background:linear-gradient(90deg,#3182F6,#5AA0FF)"></span>
+            <span class="fill" style="width:32%;background:#DCE6F4"></span>
+          </div>
+        </div>
+        <div class="barrow">
+          <div class="lbl"><span>매입가 11.5억 + 누적 비용</span><span class="num mut">13.6억</span></div>
+          <div class="track">
+            <span class="fill" style="width:55%;background:#9DB4D6"></span>
+            <span class="fill" style="width:10%;background:#F0A6AC"></span>
+            <span class="fill" style="width:35%;background:#EAF0F7"></span>
+          </div>
+        </div>
+
+        <div class="selfbox">
+          <div class="t">🏡 자택 거주가치 포함 시</div>
+          <div style="text-align:right">
+            <div class="v num">+4억 8천 <span style="font-size:13px">/ 수익률 116%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="sec-title">⚖️ 본전 분기점</div>
+        <div class="be">
+          <div class="gauge">
+            <svg viewBox="0 0 120 120" width="120" height="120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#EDF0F3" stroke-width="12"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#3182F6" stroke-width="12" stroke-linecap="round"
+                stroke-dasharray="314" stroke-dashoffset="170" transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="lab"><div class="n num">8.4%</div><div class="u">연 본전 상승률</div></div>
+          </div>
+          <div class="desc">
+            집값이 매년 <b>8.4% 이상</b> 오르면 모든 비용을 메우고 이득이 남아요.<br>
+            대출 <b>이자만</b> 따지면 연 <b>4.1%</b>가 손익분기점입니다.<br>
+            <span class="mut">최근 12개월 실제 상승률은 +43.1% — 여유 있게 본전 통과.</span>
+          </div>
+        </div>
+
+        <div class="costs" style="margin-top:18px">
+          <div class="crow"><span class="k"><span class="ic">🧾</span>취득세</span><span class="v num">3,795만</span></div>
+          <div class="crow"><span class="k"><span class="ic">🤝</span>중개보수</span><span class="v num">1,012만</span></div>
+          <div class="crow"><span class="k"><span class="ic">🏦</span>대출이자 누적 (7년)</span><span class="v num">1억 8,000만</span></div>
+          <div class="crow"><span class="k"><span class="ic">🏛️</span>보유세 (7년)</span><span class="v num">2,400만</span></div>
+          <div class="crow"><span class="k"><span class="ic">💸</span>양도세 <span class="free">1주택 비과세</span></span><span class="v num">0원</span></div>
+          <div class="crow"><span class="k"><span class="ic">⏳</span>자기자본 기회비용</span><span class="v num">1억 2,000만</span></div>
+          <div class="crow total"><span class="k">7년 총 비용</span><span class="v num">약 2억 1,000만</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="sec-title">🧮 판정 근거 요약</div>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);gap:14px">
+        <div style="padding:16px;background:#F8FAFC;border-radius:14px">
+          <div class="mut" style="font-size:12.5px;font-weight:600">매매/전세 갭</div>
+          <div class="num" style="font-size:22px;font-weight:800;margin-top:4px">4.3<small style="font-size:13px">억</small></div>
+          <div class="mut" style="font-size:11.5px;margin-top:3px">전세가율 62.9% · 안정권</div>
+        </div>
+        <div style="padding:16px;background:#F8FAFC;border-radius:14px">
+          <div class="mut" style="font-size:12.5px;font-weight:600">시세 모멘텀</div>
+          <div class="num pos" style="font-size:22px;font-weight:800;margin-top:4px">강함</div>
+          <div class="mut" style="font-size:11.5px;margin-top:3px">12개월 +43.1% 우상향</div>
+        </div>
+        <div style="padding:16px;background:#F8FAFC;border-radius:14px">
+          <div class="mut" style="font-size:12.5px;font-weight:600">건축 연식</div>
+          <div class="num" style="font-size:22px;font-weight:800;margin-top:4px">27<small style="font-size:13px">년</small></div>
+          <div class="mut" style="font-size:11.5px;margin-top:3px">재건축 기대 연식 진입</div>
+        </div>
+        <div style="padding:16px;background:#F8FAFC;border-radius:14px">
+          <div class="mut" style="font-size:12.5px;font-weight:600">데이터 신뢰도</div>
+          <div class="num pos" style="font-size:22px;font-weight:800;margin-top:4px">높음</div>
+          <div class="mut" style="font-size:11.5px;margin-top:3px">최근 12개월 거래 38건</div>
+        </div>
+      </div>
+      <div class="infonote">ℹ️ 본 분석은 국토부 실거래가 기반 추정치이며, 7년 보유·연 8.4% 상승 가정 시나리오입니다. 실제 세금·대출 조건은 개인별로 달라질 수 있어요. 투자 판단의 참고 자료로만 활용하세요.</div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW 2: 지도·랭킹 ============ -->
+  <section class="view" id="map">
+    <div class="maprow">
+      <div class="card card-pad">
+        <div class="sec-title">🗺 서울 구별 12개월 상승률</div>
+        <div class="mapgrid">
+          <div class="gu" style="background:#1B64DA"><div class="nm">서초</div><div class="pc">+18%</div></div>
+          <div class="gu" style="background:#2D74E8"><div class="nm">강남</div><div class="pc">+15%</div></div>
+          <div class="gu" style="background:#3A7DEC"><div class="nm">송파</div><div class="pc">+14%</div></div>
+          <div class="gu" style="background:#4585EE"><div class="nm">동대문</div><div class="pc">+13%</div></div>
+          <div class="gu" style="background:#5C95F1"><div class="nm">마포</div><div class="pc">+11%</div></div>
+          <div class="gu" style="background:#6FA2F3"><div class="nm">성동</div><div class="pc">+10%</div></div>
+          <div class="gu" style="background:#82AEF5"><div class="nm">광진</div><div class="pc">+9%</div></div>
+          <div class="gu" style="background:#94BBF7"><div class="nm">영등포</div><div class="pc">+9%</div></div>
+          <div class="gu" style="background:#A7C7F8"><div class="nm">용산</div><div class="pc">+8%</div></div>
+          <div class="gu" style="background:#B6D0FA"><div class="nm">강동</div><div class="pc">+8%</div></div>
+          <div class="gu" style="background:#C5D9FB"><div class="nm">양천</div><div class="pc">+7%</div></div>
+          <div class="gu" style="background:#CFE0FC"><div class="nm">서대문</div><div class="pc">+7%</div></div>
+          <div class="gu" style="background:#D8E6FD;color:#3A6BB5"><div class="nm">은평</div><div class="pc">+6%</div></div>
+          <div class="gu" style="background:#E0EBFD;color:#3A6BB5"><div class="nm">노원</div><div class="pc">+6%</div></div>
+          <div class="gu" style="background:#E8F1FE;color:#5C8AD0"><div class="nm">도봉</div><div class="pc">+5%</div></div>
+        </div>
+        <div class="scale">
+          <span>낮음 +5%</span><span class="bar"></span><span>높음 +18%</span>
+        </div>
+        <div class="infonote" style="margin-top:16px">📍 <b>서초구</b>가 +18%로 1위. 동대문구는 +13%로 상위권이며, 그 안의 <b>답십리동 동아</b>가 단지 단위로는 +43.1%로 구 평균을 크게 상회합니다.</div>
+      </div>
+
+      <div class="card card-pad">
+        <div class="sec-title">🏆 전 단지 상승률 랭킹 (12개월)</div>
+        <table>
+          <thead><tr><th>#</th><th>단지</th><th>지역</th><th class="r">현재가</th><th class="r">12M 상승</th></tr></thead>
+          <tbody>
+            <tr><td><span class="rk g1">1</span></td><td class="nmcell">반포자이</td><td class="mut">서초구</td><td class="r num">38.5억</td><td class="r pos num">+51%<span class="minibar"><i style="width:100%"></i></span></td></tr>
+            <tr style="background:var(--blue-soft2)"><td><span class="rk g2">2</span></td><td class="nmcell"><b>동아</b> <span class="badge" style="font-size:10px;padding:2px 7px">선택</span></td><td class="mut">동대문구</td><td class="r num">11.5억</td><td class="r pos num">+43%<span class="minibar"><i style="width:84%"></i></span></td></tr>
+            <tr><td><span class="rk g3">3</span></td><td class="nmcell">헬리오시티</td><td class="mut">송파구</td><td class="r num">18.2억</td><td class="r pos num">+38%<span class="minibar"><i style="width:75%"></i></span></td></tr>
+            <tr><td><span class="rk">4</span></td><td class="nmcell">래미안대치팰리스</td><td class="mut">강남구</td><td class="r num">31.0억</td><td class="r pos num">+35%<span class="minibar"><i style="width:69%"></i></span></td></tr>
+            <tr><td><span class="rk">5</span></td><td class="nmcell">마포래미안푸르지오</td><td class="mut">마포구</td><td class="r num">14.1억</td><td class="r pos num">+31%<span class="minibar"><i style="width:61%"></i></span></td></tr>
+            <tr><td><span class="rk">6</span></td><td class="nmcell">잠실엘스</td><td class="mut">송파구</td><td class="r num">23.4억</td><td class="r pos num">+29%<span class="minibar"><i style="width:57%"></i></span></td></tr>
+            <tr><td><span class="rk">7</span></td><td class="nmcell">e편한세상금호파크힐스</td><td class="mut">성동구</td><td class="r num">17.8억</td><td class="r pos num">+27%<span class="minibar"><i style="width:53%"></i></span></td></tr>
+            <tr><td><span class="rk">8</span></td><td class="nmcell">목동신시가지7단지</td><td class="mut">양천구</td><td class="r num">21.6억</td><td class="r pos num">+24%<span class="minibar"><i style="width:47%"></i></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW 3: 맞춤추천 ============ -->
+  <section class="view" id="rec">
+    <div class="reclayout">
+      <div class="card card-pad filtcard">
+        <div class="sec-title">⚙️ 조건 & 가중치</div>
+
+        <div class="fgroup">
+          <div class="flbl">가격대</div>
+          <div class="chips">
+            <span class="chip">~8억</span><span class="chip on">8~15억</span><span class="chip">15~25억</span><span class="chip">25억+</span>
+          </div>
+        </div>
+        <div class="fgroup">
+          <div class="flbl">평형대</div>
+          <div class="chips">
+            <span class="chip">~24평</span><span class="chip on">25~34평</span><span class="chip">35~44평</span><span class="chip">45평+</span>
+          </div>
+        </div>
+        <div class="fgroup">
+          <div class="flbl">보유 기간</div>
+          <div class="chips">
+            <span class="chip">3년</span><span class="chip">5년</span><span class="chip on">7년</span><span class="chip">10년</span>
+          </div>
+        </div>
+
+        <div class="fgroup" style="margin-top:24px">
+          <div class="flbl">지표 가중치</div>
+          <div class="wrow"><div class="wt"><span>💰 가성비</span><span class="wv">25%</span></div><input type="range" class="rng" min="0" max="100" value="25" style="background:linear-gradient(90deg,#3182F6 25%,#EAF0F7 25%)"></div>
+          <div class="wrow"><div class="wt"><span>📐 평수</span><span class="wv">15%</span></div><input type="range" class="rng" min="0" max="100" value="15" style="background:linear-gradient(90deg,#3182F6 15%,#EAF0F7 15%)"></div>
+          <div class="wrow"><div class="wt"><span>🏗 건축년도</span><span class="wv">10%</span></div><input type="range" class="rng" min="0" max="100" value="10" style="background:linear-gradient(90deg,#3182F6 10%,#EAF0F7 10%)"></div>
+          <div class="wrow"><div class="wt"><span>📈 상승률</span><span class="wv">30%</span></div><input type="range" class="rng" min="0" max="100" value="30" style="background:linear-gradient(90deg,#3182F6 30%,#EAF0F7 30%)"></div>
+          <div class="wrow"><div class="wt"><span>🏠 전세가율</span><span class="wv">12%</span></div><input type="range" class="rng" min="0" max="100" value="12" style="background:linear-gradient(90deg,#3182F6 12%,#EAF0F7 12%)"></div>
+          <div class="wrow"><div class="wt"><span>✅ 신뢰도</span><span class="wv">8%</span></div><input type="range" class="rng" min="0" max="100" value="8" style="background:linear-gradient(90deg,#3182F6 8%,#EAF0F7 8%)"></div>
+        </div>
+
+        <button class="applybtn">맞춤 단지 다시 찾기</button>
+      </div>
+
+      <div class="card">
+        <div class="card-pad" style="padding-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div class="sec-title" style="margin:0">◎ 내 조건 맞춤 단지 · 점수순 6곳</div>
+          <span class="mut" style="font-size:12.5px">총 1,284개 단지 분석 완료</span>
+        </div>
+
+        <div class="reccard">
+          <div class="recscore"><div class="n num">92</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">동아 <span class="loc">동대문구 답십리동</span></div>
+            <div class="rectags"><span class="rtag">🏗 1999년</span><span class="rtag">12M <b>+43.1%</b></span><span class="rtag">전세가율 <b>62.9%</b></span><span class="rtag">25.7평</span></div>
+          </div>
+          <div class="recprice"><div class="v num">11.5<span class="u">억</span></div><div class="ch">▲ 모멘텀 최상</div></div>
+        </div>
+        <div class="reccard">
+          <div class="recscore s2"><div class="n num">88</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">헬리오시티 <span class="loc">송파구 가락동</span></div>
+            <div class="rectags"><span class="rtag">🏗 2018년</span><span class="rtag">12M <b>+38%</b></span><span class="rtag">전세가율 <b>55%</b></span><span class="rtag">신축 대단지</span></div>
+          </div>
+          <div class="recprice"><div class="v num">18.2<span class="u">억</span></div><div class="ch">▲ 신축 프리미엄</div></div>
+        </div>
+        <div class="reccard">
+          <div class="recscore s3"><div class="n num">85</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">마포래미안푸르지오 <span class="loc">마포구 아현동</span></div>
+            <div class="rectags"><span class="rtag">🏗 2014년</span><span class="rtag">12M <b>+31%</b></span><span class="rtag">전세가율 <b>58%</b></span><span class="rtag">도심 접근성</span></div>
+          </div>
+          <div class="recprice"><div class="v num">14.1<span class="u">억</span></div><div class="ch">▲ 균형형</div></div>
+        </div>
+        <div class="reccard">
+          <div class="recscore s4"><div class="n num">81</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">e편한세상금호파크힐스 <span class="loc">성동구 금호동</span></div>
+            <div class="rectags"><span class="rtag">🏗 2019년</span><span class="rtag">12M <b>+27%</b></span><span class="rtag">전세가율 <b>53%</b></span><span class="rtag">한강 인접</span></div>
+          </div>
+          <div class="recprice"><div class="v num">17.8<span class="u">억</span></div><div class="ch">▲ 신축 안정</div></div>
+        </div>
+        <div class="reccard">
+          <div class="recscore s4"><div class="n num">78</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">래미안위브 <span class="loc">동대문구 전농동</span></div>
+            <div class="rectags"><span class="rtag">🏗 2010년</span><span class="rtag">12M <b>+25%</b></span><span class="rtag">전세가율 <b>61%</b></span><span class="rtag">가성비</span></div>
+          </div>
+          <div class="recprice"><div class="v num">10.3<span class="u">억</span></div><div class="ch">▲ 진입 부담 ↓</div></div>
+        </div>
+        <div class="reccard">
+          <div class="recscore s4"><div class="n num">74</div><div class="u">점</div></div>
+          <div class="recmain">
+            <div class="nm">목동신시가지7단지 <span class="loc">양천구 목동</span></div>
+            <div class="rectags"><span class="rtag">🏗 1986년</span><span class="rtag">12M <b>+24%</b></span><span class="rtag">전세가율 <b>49%</b></span><span class="rtag">재건축 기대</span></div>
+          </div>
+          <div class="recprice"><div class="v num">21.6<span class="u">억</span></div><div class="ch">▲ 재건축 호재</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    집값나침반 · 국토교통부 실거래가 공개시스템 데이터 기반 · 본 화면은 디자인 시안(목업)입니다<br>
+    투자 결과를 보장하지 않으며 모든 판단의 책임은 이용자에게 있습니다.
+  </div>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const views = document.querySelectorAll('.view');
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    views.forEach(v=>v.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.v).classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }));
+  // chip toggle within group
+  document.querySelectorAll('.chips').forEach(g=>{
+    g.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+      g.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+      c.classList.add('on');
+    }));
+  });
+  // weight sliders live update fill + %
+  document.querySelectorAll('.rng').forEach(r=>{
+    const wv = r.closest('.wrow')?.querySelector('.wv');
+    r.addEventListener('input',()=>{
+      const v=r.value;
+      r.style.background=`linear-gradient(90deg,#3182F6 ${v}%,#EAF0F7 ${v}%)`;
+      if(wv) wv.textContent=v+'%';
+    });
+  });
+  // like toggle
+  document.querySelector('.like')?.addEventListener('click',function(){
+    this.textContent = this.textContent.trim()==='🤍' ? '❤️' : '🤍';
+  });
+</script>
+</body>
+</html>
