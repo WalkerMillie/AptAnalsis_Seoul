@@ -201,8 +201,10 @@
       <div>
         <label>얼마 동안의 상승률로 볼까요?</label>
         <div class="seg" id="monthsSeg">
-          <button data-m="6">최근 6개월</button>
-          <button data-m="12" class="on">최근 12개월</button>
+          <button data-m="6">6개월</button>
+          <button data-m="12" class="on">12개월</button>
+          <button data-m="24">24개월</button>
+          <button data-m="36">36개월</button>
         </div>
       </div>
     </div>
@@ -222,9 +224,9 @@
     <details id="myCond">
       <summary>내 조건으로 다시 계산하기</summary>
       <div class="row" style="margin-top:12px">
-        <div class="grow"><label>매매가 (원)</label><input id="purchase_price" type="number"></div>
-        <div class="grow"><label>대출액 (원)</label><input id="loan_amount" type="number" value="600000000"></div>
-        <div class="grow"><label>자기자본 (원) <span class="muted" style="font-weight:400">· 자동 = 매매가 − 대출</span></label>
+        <div class="grow"><label>매매가 (억) <span class="muted" style="font-weight:400">· 예: 8.5 = 8억5천</span></label><input id="purchase_price" type="number" step="0.1"></div>
+        <div class="grow"><label>대출액 (억)</label><input id="loan_amount" type="number" step="0.1" value="6"></div>
+        <div class="grow"><label>자기자본 (억) <span class="muted" style="font-weight:400">· 자동 = 매매가 − 대출</span></label>
           <input id="equity" type="number" readonly style="background:#f4f6f9"></div>
       </div>
       <div id="fundWarn" class="note hidden" style="color:var(--bad)"></div>
@@ -256,7 +258,7 @@
     <div class="row" style="margin-bottom:4px">
       <div><label>기간</label>
         <div class="seg" id="rkMonthsSeg">
-          <button data-m="6">6개월</button><button data-m="12" class="on">12개월</button>
+          <button data-m="6">6개월</button><button data-m="12" class="on">12개월</button><button data-m="24">24개월</button><button data-m="36">36개월</button>
         </div></div>
       <div><label><span class="tip" data-tip="거래가 적은 단지는 우연히 튄 한두 건에 좌우돼요. 최소 거래수를 높이면 더 믿을 만한 단지만 봅니다.">최소 거래수</span></label>
         <select id="rkMin" style="width:auto"><option>5</option><option selected>10</option><option>20</option><option>30</option></select></div>
@@ -290,10 +292,10 @@
     <div class="row" style="gap:18px; margin-bottom:6px">
       <div class="grow"><label>가격대 (억) · 빈칸=제한없음</label>
         <div class="searchrow"><input id="fPriceMin" type="number" step="0.5" placeholder="최소"><input id="fPriceMax" type="number" step="0.5" placeholder="최대"></div></div>
-      <div class="grow"><label>평형대 (㎡) · 빈칸=제한없음</label>
+      <div class="grow"><label>평형대 (평) · 빈칸=제한없음</label>
         <div class="searchrow"><input id="fAreaMin" type="number" placeholder="최소"><input id="fAreaMax" type="number" placeholder="최대"></div></div>
       <div><label>기간</label>
-        <div class="seg" id="recoMonthsSeg"><button data-m="6">6개월</button><button data-m="12" class="on">12개월</button></div></div>
+        <div class="seg" id="recoMonthsSeg"><button data-m="6">6개월</button><button data-m="12" class="on">12개월</button><button data-m="24">24개월</button><button data-m="36">36개월</button></div></div>
     </div>
 
     <div id="weights" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px 18px; margin:10px 0 4px"></div>
@@ -312,8 +314,14 @@
 const $ = id => document.getElementById(id);
 
 // ── 포맷 ──
-const won = n => { n=Math.round(n); const e=Math.floor(n/1e8), m=Math.round((n%1e8)/1e4);
-  if(e&&m) return `${e}억 ${m.toLocaleString()}만`; if(e) return `${e}억`; return `${m.toLocaleString()}만`; };
+// 금액 → "X억N천"(N=천만원 단위). 1억 미만은 "N,NNN만". 음수 부호 보존.
+const won = v => { const neg=v<0; const n=Math.round(Math.abs(v));
+  let e=Math.floor(n/1e8), c=Math.round((n%1e8)/1e7); if(c===10){e+=1;c=0;}
+  let s; if(e&&c) s=`${e}억${c}천`; else if(e) s=`${e}억`;
+  else s=`${Math.round(n/1e4).toLocaleString()}만`;
+  return (neg?'-':'')+s; };
+const EOK = 1e8;
+const py = m2 => m2? `${Math.round(m2/3.3058)}평` : '';     // 전용면적 ㎡ → 평
 const pct  = x => (x>=0?'':'') + (x*100).toFixed(1) + '%';
 const pctp = x => (x>=0?'+':'') + (x*100).toFixed(1) + '%p';
 const pyeong = ppm2 => Math.round(ppm2*3.3058/1e4).toLocaleString() + '만/평';   // 평당가(친근한 단위)
@@ -341,25 +349,37 @@ async function jpost(u,b){ const r=await fetch(u,{method:'POST',headers:{'Conten
 // ── SVG 추세 차트 ──
 function lineChart(series){
   if(!series || series.length<2) return '<div class="empty">추세를 그릴 거래가 부족해요.</div>';
-  const W=600,H=190,P=34;
+  const W=640,H=212, PL=70,PR=16,PT=22,PB=30;   // 좌:가격라벨 / 하:연월라벨 여백 확보
+  const x0=PL, x1=W-PR, y0=PT, y1=H-PB;
   const ys=series.map(s=>s.ppm2), min=Math.min(...ys), max=Math.max(...ys), span=(max-min)||1;
-  const x=i=> P + i*(W-2*P)/(series.length-1);
-  const y=v=> H-P - (v-min)*(H-2*P)/span;
+  const x=i=> x0 + i*(x1-x0)/(series.length-1);
+  const y=v=> y0 + (max-v)*(y1-y0)/span;
   const pts=series.map((s,i)=>[x(i),y(s.ppm2)]);
   const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
-  const area=`M${pts[0][0]} ${H-P} `+pts.map(p=>'L'+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+` L${pts[pts.length-1][0]} ${H-P} Z`;
+  const area=`M${pts[0][0].toFixed(1)} ${y1} `+pts.map(p=>'L'+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+` L${pts[pts.length-1][0].toFixed(1)} ${y1} Z`;
   const up = series[series.length-1].ppm2 >= series[0].ppm2;
   const col = up ? 'var(--good)' : 'var(--bad)';
-  const dots=pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${col}"/>`).join('');
-  // x축 라벨: 처음/중간/끝
-  const labIdx=[0, Math.floor((series.length-1)/2), series.length-1];
-  const xlab=labIdx.map(i=>`<text x="${x(i).toFixed(1)}" y="${H-8}" font-size="11" fill="var(--muted)" text-anchor="middle">${series[i].ym}</text>`).join('');
+  const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${col}"/>`).join('');
+  const pyMan = v => Math.round(v*3.3058/1e4).toLocaleString();   // ㎡당가 → 평당 만원
+  // y축 눈금 3단(최대/중간/최소): 가로 점선 + 왼쪽 바깥 라벨
+  const ylabs=[max,(max+min)/2,min].map(v=>{
+    const yy=y(v);
+    return `<line x1="${x0}" y1="${yy.toFixed(1)}" x2="${x1}" y2="${yy.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`
+      + `<text x="${x0-8}" y="${(yy+4).toFixed(1)}" font-size="11" fill="var(--muted)" text-anchor="end">${pyMan(v)}</text>`;
+  }).join('');
+  // x축 연월: 데이터 길이에 맞춰 균등 분포(최대 8개) — 기간 늘어나도 조밀하게 유지
+  const maxLab=Math.min(8, series.length);
+  const stepL=(series.length-1)/(maxLab-1);
+  const labIdx=[...new Set(Array.from({length:maxLab},(_,k)=>Math.round(k*stepL)))];
+  // 데이터 점에 옅은 세로 눈금 + 라벨 위치 표시
+  const xticks=series.map((s,i)=>`<line x1="${x(i).toFixed(1)}" y1="${y1}" x2="${x(i).toFixed(1)}" y2="${(y1+4)}" stroke="var(--line)" stroke-width="1"/>`).join('');
+  const xlab=labIdx.map(i=>`<text x="${x(i).toFixed(1)}" y="${H-9}" font-size="10.5" fill="var(--muted)" text-anchor="middle">${series[i].ym}</text>`).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">
-    <text x="${P}" y="18" font-size="11" fill="var(--muted)">평당 ${Math.round(max*3.3058/1e4).toLocaleString()}만</text>
-    <text x="${P}" y="${H-P+1}" font-size="11" fill="var(--muted)">평당 ${Math.round(min*3.3058/1e4).toLocaleString()}만</text>
-    <path d="${area}" fill="${up?'var(--good-soft)':'var(--bad-soft)'}"/>
+    <text x="${x0-8}" y="13" font-size="10.5" fill="var(--muted)" text-anchor="end">평당(만)</text>
+    ${ylabs}
+    <path d="${area}" fill="${up?'var(--good-soft)':'var(--bad-soft)'}" opacity="0.6"/>
     <path d="${line}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>
-    ${dots}${xlab}
+    ${xticks}${dots}${xlab}
   </svg>`;
 }
 
@@ -427,7 +447,7 @@ async function loadComplexes(){
             : `<div class="g ${c.growth>=0?'pos':'neg'}">${c.growth>=0?'▲':'▼'} ${pct(Math.abs(c.growth))}</div>`;
     el.innerHTML=`<div class="rank">${i+1}</div>
       <div><div class="nm">${c.apt_name}</div>
-        <div class="meta">${c.band_m2?c.band_m2+'㎡ 기준 · ':''}거래 ${c.trade_count}건 · ${conf(c.confidence,c.confidence_tier)}</div></div>
+        <div class="meta">${c.band_m2?py(c.band_m2)+' 기준 · ':''}거래 ${c.trade_count}건 · ${conf(c.confidence,c.confidence_tier)}</div></div>
       <div class="grow">${g}<div class="meta">${listMonths}개월</div></div>`;
     el.onclick=()=>selectComplex(c, el);
     $('complexes').appendChild(el);
@@ -445,11 +465,11 @@ async function selectComplex(c, el){
   if(el) el.classList.add('active');
   curComplex=c;
   const [series, growth, trades, jeonse, jeonseSeries] = await busy('이 단지 분석 중…', ()=>Promise.all([
-    jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
+    jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
-    jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
+    jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=36`),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
   $('step3').classList.remove('hidden');
@@ -458,31 +478,30 @@ async function selectComplex(c, el){
   const by = latest && latest.build_year ? latest.build_year : 0;
   const byTxt = by ? ` · 🏗 건축 <b>${by}년</b> (${2026-by}년차)` : '';
   const jr = (jeonse && jeonse.ratio!=null) ? jeonse : null;
-  $('cxSub').innerHTML = `${curDong} · ${series.band_m2?series.band_m2+'㎡ 기준':''}`
-    + (latest? ` · 최근 실거래 <b>${won(latest.price)}</b> (${latest.contract_date}, ${latest.area_m2}㎡, ${latest.floor}층)`:'')
+  $('cxSub').innerHTML = `${curDong} · ${series.band_m2?py(series.band_m2)+' 기준':''}`
+    + (latest? ` · 최근 실거래 <b>${won(latest.price)}</b> (${latest.contract_date}, ${py(latest.area_m2)}, ${latest.floor}층)`:'')
     + (jr? ` · 전세 시세 <b>${won(jr.rent_deposit)}</b> (전세가율 ${pct(jr.ratio)})`:'')
     + byTxt;
   // 매매 + 전세 추세 차트(같은 평형 기준). 전세 표본 없으면 매매만.
-  let charts = `<div class="muted" style="font-size:12px; margin-bottom:4px">📈 매매 평당 시세 추세 (최근 12개월, ${series.band_m2||'-'}㎡)</div>` + lineChart(series.series);
+  let charts = `<div class="muted" style="font-size:12px; margin-bottom:4px">📈 매매 평당 시세 추세 (${series.band_m2?py(series.band_m2):'-'})</div>` + lineChart(series.series);
   if(jeonseSeries && jeonseSeries.series && jeonseSeries.series.length>=2){
-    charts += `<div class="muted" style="font-size:12px; margin:14px 0 4px">🏠 전세 평당 보증금 추세 (최근 12개월, ${jeonseSeries.band_m2||'-'}㎡)</div>` + lineChart(jeonseSeries.series);
+    charts += `<div class="muted" style="font-size:12px; margin:14px 0 4px">🏠 전세 평당 보증금 추세 (${jeonseSeries.band_m2?py(jeonseSeries.band_m2):'-'})</div>` + lineChart(jeonseSeries.series);
   }
   $('chartBox').innerHTML = charts;
 
-  // 내 조건 자동 프리필
-  if(latest) $('purchase_price').value = latest.price;
+  // 내 조건 자동 프리필 (억 단위)
+  if(latest) $('purchase_price').value = +(latest.price/EOK).toFixed(2);
   if(growth.growth!=null) $('assumed_growth').value = growth.growth.toFixed(4);
   runAnalyze();
   $('step3').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-// 자기자본 = 매매가 − 대출 (자동). 대출이 매매가보다 크면 경고.
+// 자기자본 = 매매가 − 대출 (자동, 억 단위). 대출이 매매가보다 크면 경고.
 function syncEquity(){
-  const p=+$('purchase_price').value||0, l=+$('loan_amount').value||0;
-  const eq=p-l;
-  $('equity').value = Math.max(0, eq);
+  const p=+$('purchase_price').value||0, l=+$('loan_amount').value||0;   // 억 단위
+  $('equity').value = Math.max(0, +(p-l).toFixed(2));
   const w=$('fundWarn');
-  if(p>0 && l>p){ w.textContent=`⚠️ 대출액(${won(l)})이 매매가(${won(p)})보다 큽니다 — 대출액을 줄여 주세요.`; w.classList.remove('hidden'); }
+  if(p>0 && l>p){ w.textContent=`⚠️ 대출액(${won(l*EOK)})이 매매가(${won(p*EOK)})보다 큽니다 — 대출액을 줄여 주세요.`; w.classList.remove('hidden'); }
   else { w.classList.add('hidden'); }
 }
 $('purchase_price').addEventListener('input', syncEquity);
@@ -493,8 +512,8 @@ async function runAnalyze(){
   syncEquity();
   const body={
     complex_id: curComplex? curComplex.complex_id : 'UNKNOWN',
-    purchase_price:+$('purchase_price').value, loan_amount:+$('loan_amount').value,
-    equity:+$('equity').value, effective_rate:+$('effective_rate').value,
+    purchase_price:(+$('purchase_price').value||0)*EOK, loan_amount:(+$('loan_amount').value||0)*EOK,
+    equity:(+$('equity').value||0)*EOK, effective_rate:+$('effective_rate').value,
     assumed_growth:+$('assumed_growth').value, holding_years:+$('holding_years').value,
     opportunity_rate:+$('opportunity_rate').value, is_first_home:$('is_first_home').checked,
     // 자택 거주가치 반영 — 단지 실측 전세가율(없으면 null=투자관점만).
@@ -515,7 +534,7 @@ function residenceBlock(d, hy){
   const v=resGood?'good':'warn';
   const head=resGood?'실거주라면 — 사도 이득이 남아요 ✅':'실거주라도 — 아직은 빠듯해요';
   const jr=curJeonse||{};
-  const band=jr.band_m2?`${jr.band_m2}㎡ 기준`:'';
+  const band=jr.band_m2?`${py(jr.band_m2)} 기준`:'';
   const depTxt=jr.rent_deposit?`전세 시세 <b>${won(jr.rent_deposit)}</b> · `:'';
   return `<div class="verdict ${v}" style="margin-top:14px; margin-bottom:0">
     <div class="big">🏠 ${head}</div>
@@ -591,7 +610,7 @@ async function runRanking(){
   let h='<tr><th>#</th><th>단지</th><th>지역</th><th>상승률</th><th>신뢰도</th><th>거래</th></tr>';
   list.forEach((c,i)=>{
     h+=`<tr class="clickable" data-r="${c.region_code}" data-d="${c.dong}">
-      <td>${i+1}</td><td>${c.apt_name} <span class="muted">${c.band_m2}㎡</span></td>
+      <td>${i+1}</td><td>${c.apt_name} <span class="muted">${py(c.band_m2)}</span></td>
       <td>${districtName[c.region_code]||''} ${c.dong}</td>
       <td class="${c.growth>=0?'pos':'neg'}"><b>${c.growth>=0?'▲':'▼'} ${pct(Math.abs(c.growth))}</b></td>
       <td>${conf(c.confidence,c.confidence_tier)}</td>
@@ -730,11 +749,11 @@ function renderReco(){
   const pMin=parseFloat($('fPriceMin').value), pMax=parseFloat($('fPriceMax').value);
   const aMin=parseFloat($('fAreaMin').value), aMax=parseFloat($('fAreaMax').value);
   let rows=_candidates.filter(c=>{
-    const eok=c.total_price/1e8;
+    const eok=c.total_price/1e8, pyeongArea=c.area_m2/3.3058;
     if(!isNaN(pMin)&&eok<pMin) return false;
     if(!isNaN(pMax)&&eok>pMax) return false;
-    if(!isNaN(aMin)&&c.area_m2<aMin) return false;
-    if(!isNaN(aMax)&&c.area_m2>aMax) return false;
+    if(!isNaN(aMin)&&pyeongArea<aMin) return false;
+    if(!isNaN(aMax)&&pyeongArea>aMax) return false;
     return true;
   });
   const weights=RECO_METRICS.map(m=>({...m, w:+$('w_'+m.key).value}));
@@ -759,7 +778,7 @@ function renderReco(){
     const jr = c.jeonse_ratio!=null? `전세가율 ${pct(c.jeonse_ratio)}` : '전세 표본부족';
     const gtxt = `<span class="${c.growth>=0?'pos':'neg'}">${c.growth>=0?'▲':'▼'}${pct(Math.abs(c.growth))}</span>`;
     el.innerHTML=`<div class="rank">${i+1}</div>
-      <div><div class="nm">${c.apt_name} <span class="muted" style="font-weight:400">${c.area_m2}㎡</span></div>
+      <div><div class="nm">${c.apt_name} <span class="muted" style="font-weight:400">${py(c.area_m2)}</span></div>
         <div class="meta">${districtName[c.region_code]||''} ${c.dong} · ${won(c.total_price)} · 🏗${c.build_year||'-'} · 12M ${gtxt} · ${jr}</div></div>
       <div class="grow"><div class="g" style="color:var(--accent)">${Math.round(c._score)}</div><div class="meta">점</div></div>`;
     el.onclick=()=>openDong(c.region_code, c.dong, c.complex_id);
