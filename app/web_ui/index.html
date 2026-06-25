@@ -364,6 +364,9 @@
   /* 네이버 바로가기 칩 */
   a.chip.nv{ text-decoration:none; color:#03c75a; border-color:color-mix(in srgb,#03c75a 45%,var(--line)); font-weight:700; }
   a.chip.nv:hover{ background:color-mix(in srgb,#03c75a 14%,transparent); border-color:#03c75a; }
+  /* 인근 지하철역 칩 */
+  .chip.rail{ color:var(--blue); border-color:color-mix(in srgb,var(--blue) 45%,var(--line));
+    font-weight:600; background:color-mix(in srgb,var(--blue) 8%,transparent); cursor:default; }
 </style>
 </head>
 <body>
@@ -755,18 +758,27 @@ $('monthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 
 // ===== STEP 3 =====
 let curComplex=null, curGrowth=null, curJeonse=null;
+// 동 중심 기준 최근접 지하철역(키리스 정적표) — 1회 fetch 후 캐시.
+let _subwayNear=null;
+async function ensureSubway(){
+  if(_subwayNear) return _subwayNear;
+  try{ _subwayNear = await jget('/data/subway_near.json'); }
+  catch(e){ _subwayNear = {}; }
+  window._subwayNear = _subwayNear; return _subwayNear;
+}
 async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
   syncURL();                       // 단지 선택 → 현재 엔트리에 cid 반영(replace)
-  const [series, growth, trades, jeonse, jeonseSeries, regsum] = await busy('이 단지 분석 중…', ()=>Promise.all([
+  const [series, growth, trades, jeonse, jeonseSeries, regsum, _sw] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
     jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     getRegsum(),
+    ensureSubway(),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
   const latest = (trades.trades||[])[0];
@@ -802,6 +814,10 @@ function renderHero(c, series, growth, latest, jeonse){
   const jr = (jeonse && jeonse.ratio!=null) ? jeonse : null;
   const g = growth && growth.growth!=null ? growth.growth : null;
   const bigEok = latest ? (latest.price/EOK) : null;
+  const q = encodeURIComponent(((districtName[curRegion]||'')+' '+(curDong||'')+' '+c.apt_name).trim()+' 아파트');
+  const near = (_subwayNear||{})[curRegion+'|'+curDong];
+  const distTxt = d => d<1000 ? d+'m' : (d/1000).toFixed(1)+'km';
+  const railChip = near ? `<span class="chip rail" title="${curDong} 중심 기준 약 ${distTxt(near.dist_m)}${near.approx?' · 구 중심 근사':''} · 1~8호선 기준">🚇 ${near.station} ${near.line} · ${distTxt(near.dist_m)}</span>` : '';
   $('heroBox').innerHTML = `<div class="hero-top">
     <div class="hero-id">
       <h1>${c.apt_name} <span class="mute" style="font-size:13px; font-weight:400">${curDong}</span></h1>
@@ -810,7 +826,9 @@ function renderHero(c, series, growth, latest, jeonse){
         ${band?`<span class="chip">${py(band)} · ${Math.round(band)}㎡</span>`:''}
         ${by?`<span class="chip">🏗 ${by}년 · ${2026-by}년차</span>`:''}
         ${jr?`<span class="chip b">전세가율 ${pct(jr.ratio)}</span>`:''}
-        <a class="chip nv" href="https://search.naver.com/search.naver?query=${encodeURIComponent(((districtName[curRegion]||'')+' '+(curDong||'')+' '+c.apt_name).trim()+' 아파트')}" target="_blank" rel="noopener" title="네이버에서 이 단지 검색">네이버 ↗</a>
+        ${railChip}
+        <a class="chip nv" href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener" title="네이버 지도에서 이 단지 보기">🗺 네이버지도 ↗</a>
+        <a class="chip nv" href="https://search.naver.com/search.naver?query=${q}" target="_blank" rel="noopener" title="네이버에서 이 단지 검색">네이버 ↗</a>
       </div>
     </div>
     <div class="hero-price">

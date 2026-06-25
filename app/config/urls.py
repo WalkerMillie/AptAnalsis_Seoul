@@ -2,7 +2,7 @@
 
 from django.urls import include, path
 
-from config.ui_view import index, mockups
+from config.ui_view import index, mockups, subway_near
 
 urlpatterns = [
     path("", index, name="ui_index"),
@@ -11,6 +11,7 @@ urlpatterns = [
     path("analyze", index, name="ui_analyze"),
     path("explore", index, name="ui_explore"),
     path("reco", index, name="ui_reco"),
+    path("data/subway_near.json", subway_near, name="ui_subway_near"),
     path("mockups/", mockups, name="ui_mockups"),
     path("mockups/<str:name>", mockups, name="ui_mockup"),
     path("api/region/", include("contexts.region.adapters.web.urls")),

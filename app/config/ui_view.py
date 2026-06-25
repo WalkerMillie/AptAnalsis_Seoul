@@ -11,10 +11,19 @@ from django.http import Http404, HttpResponse
 _WEB_UI = Path(__file__).resolve().parent.parent / "web_ui"
 _INDEX = _WEB_UI / "index.html"
 _MOCKUPS = _WEB_UI / "mockups"
+_SUBWAY_NEAR = _WEB_UI / "subway_near.json"
 
 
 def index(request):
     return HttpResponse(_INDEX.read_text(encoding="utf-8"))
+
+
+def subway_near(request):
+    """동(법정동) 중심 기준 최근접 지하철역 사전계산표(키리스 정적 데이터).
+    좌표 출처: korean-geocoding(행정구역 centroid) + 공공데이터 1~8호선 역좌표.
+    동 단위 근사치 — 정밀 최근접은 단지 지오코딩(차기) 필요."""
+    return HttpResponse(_SUBWAY_NEAR.read_text(encoding="utf-8"),
+                        content_type="application/json")
 
 
 def mockups(request, name=""):
