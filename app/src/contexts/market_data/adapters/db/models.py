@@ -23,6 +23,9 @@ class TradeRecord(models.Model):
                 fields=["complex_id", "contract_date", "area_m2", "floor"],
                 name="uq_trade_natural"),          # 자연키 — idempotent upsert
         ]
+        # 전국 집계(랭킹·지도·후보)는 contract_date>=start 윈도우 스캔 + Max(anchor)에
+        # 의존한다. 단독 인덱스로 풀스캔 회피(단지별 조회는 위 unique의 complex_id prefix가 커버).
+        indexes = [models.Index(fields=["contract_date"], name="ix_trade_cd")]
 
 
 class RentRecord(models.Model):
@@ -43,6 +46,7 @@ class RentRecord(models.Model):
                 fields=["complex_id", "contract_date", "area_m2", "floor"],
                 name="uq_rent_natural"),
         ]
+        indexes = [models.Index(fields=["contract_date"], name="ix_rent_cd")]
 
 
 class CollectionJobRecord(models.Model):
