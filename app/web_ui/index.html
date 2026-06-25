@@ -150,7 +150,10 @@
   .citem{ display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid var(--line);
     border-radius:5px; cursor:pointer; background:var(--bg); transition:.12s; }
   .citem:hover{ border-color:var(--amber); }
-  .citem.active{ border-color:var(--amber); background:rgba(255,176,0,.06); }
+  /* 포커싱: 앰버 링 + 좌측 액센트 바로 또렷하게 */
+  .citem.active{ border-color:var(--amber); background:rgba(255,176,0,.12);
+    box-shadow:0 0 0 2px rgba(255,176,0,.4), inset 3px 0 0 var(--amber); }
+  .citem.active .nm{ color:var(--amber); }
   .citem .nm{ font-weight:600; color:var(--txt); font-size:12.5px; }
   .citem .meta{ color:var(--txt-mute); font-size:10.5px; margin-top:2px; font-family:var(--mono); }
   .citem .grow{ margin-left:auto; text-align:right; flex:0 0 auto; }
@@ -785,7 +788,7 @@ async function loadComplexes(){
   $('complexes').innerHTML='';
   if(!list.length){ $('complexes').innerHTML='<div class="empty">표시할 단지가 없어요.</div>'; return; }
   list.forEach((c,i)=>{
-    const el=document.createElement('div'); el.className='citem';
+    const el=document.createElement('div'); el.className='citem'; el.dataset.cid=c.complex_id;
     const g = c.growth==null ? '<span class="muted" style="font-size:13px">데이터 부족</span>'
             : `<div class="g ${c.growth>=0?'pos':'neg'}">${c.growth>=0?'▲':'▼'} ${pct(Math.abs(c.growth))}</div>`;
     el.innerHTML=`<div class="rank">${i+1}</div>
@@ -906,10 +909,22 @@ async function runTransit(opt, btn){
         <div class="tr-legs">${rt.legs.map(_trLeg).join('<span class="tr-arr">›</span>')}</div></div>`).join('');
   }catch(e){ res.innerHTML=`<div class="tr-fail">지금은 교통 경로를 불러오기 어려워요.</div>`; }
 }
+// 좌측 단지 리스트에서 해당 단지 포커싱 + 리스트 내부 자동 스크롤(페이지 점프 없음).
+function focusComplexItem(cid){
+  const list=$('complexes'); if(!list) return;
+  let target=null;
+  list.querySelectorAll('.citem').forEach(x=>{
+    const on = x.dataset.cid===cid; x.classList.toggle('active', on); if(on) target=x;
+  });
+  if(!target) return;
+  const ir=target.getBoundingClientRect(), lr=list.getBoundingClientRect();
+  const delta=(ir.top-lr.top)-(lr.height/2-ir.height/2);   // 리스트 중앙으로
+  list.scrollBy({top:delta, behavior:'smooth'});
+}
 async function selectComplex(c, el){
-  document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
-  if(el) el.classList.add('active');
   curComplex=c;
+  focusComplexItem(c.complex_id);   // 클릭/딥링크 무관하게 포커싱+스크롤
+  syncURL();
   syncURL();                       // 단지 선택 → 현재 엔트리에 cid 반영(replace)
   const [series, growth, trades, jeonse, jeonseSeries, regsum, geo] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
