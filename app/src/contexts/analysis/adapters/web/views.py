@@ -10,16 +10,19 @@ from datetime import date
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contexts.analysis.application import AnalysisService
+from contexts.analysis.application import AICommentService, AnalysisService
 from contexts.analysis.adapters.an_dt01_loader import load_an_dt01_table
 from contexts.analysis.adapters.an_dt02_loader import load_an_dt02_table
+from contexts.analysis.adapters.llm_cli import make_llm_client
 from contexts.analysis.adapters.web.serializers import (
+    AICommentRequestSerializer,
     AnalyzeRequestSerializer,
     AnalyzeResponseSerializer,
 )
 
 # 합성 루트: 어댑터 로더로 표를 만들어 유스케이스에 주입(한 번만 로드).
 _service = None
+_ai_service = None
 
 
 def get_service() -> AnalysisService:
@@ -27,6 +30,13 @@ def get_service() -> AnalysisService:
     if _service is None:
         _service = AnalysisService(load_an_dt01_table(), load_an_dt02_table())
     return _service
+
+
+def get_ai_service() -> AICommentService:
+    global _ai_service
+    if _ai_service is None:
+        _ai_service = AICommentService(make_llm_client())
+    return _ai_service
 
 
 class AnalysisView(APIView):
@@ -51,3 +61,13 @@ class AnalysisView(APIView):
             conversion_rate=d.get("conversion_rate"),
         )
         return Response(AnalyzeResponseSerializer(asdict(result)).data)
+
+
+class AICommentView(APIView):
+    """온디맨드 AI 코멘트. 실패해도 200 + {ok:false, message} — FE가 부드럽게 노출(500 없음)."""
+
+    def post(self, request):
+        req = AICommentRequestSerializer(data=request.data)
+        req.is_valid(raise_exception=True)
+        result = get_ai_service().comment(dict(req.validated_data))
+        return Response(asdict(result))

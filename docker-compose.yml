@@ -13,6 +13,10 @@ services:
       # 24개월이라 첫 시딩은 수십 분 — 줄이려면 끝쪽 6~12개월만 남기면 됨.
       SEED_ON_START: "1"
       SEED_MONTHS: "202406 202407 202408 202409 202410 202411 202412 202501 202502 202503 202504 202505 202506 202507 202508 202509 202510 202511 202512 202601 202602 202603 202604 202605"
+      # [개발용] AI 코멘트는 컨테이너에 node/claude가 없어 호스트 shim(docker/ai_shim.py)에 위임.
+      # 키 발급되면 AI_PROVIDER=anthropic + ANTHROPIC_API_KEY 로 교체하고 이 두 줄·shim 제거.
+      AI_PROVIDER: "http"
+      AI_SHIM_URL: "http://host.docker.internal:8765/gen"
     volumes:
       # DB만 영속 — 코드는 이미지에 포함. 한 번 시딩하면 재기동은 즉시.
       - seoul_db:/data

@@ -20,6 +20,24 @@ class AnalyzeRequestSerializer(serializers.Serializer):
     conversion_rate = serializers.FloatField(min_value=0, required=False, allow_null=True)
 
 
+class AICommentRequestSerializer(serializers.Serializer):
+    """AI 코멘트 컨텍스트 — FE가 이미 계산한 RS/전세가율 등을 그대로 받는다(백엔드 재계산 없음)."""
+    complex_name = serializers.CharField()
+    gu = serializers.CharField(required=False, allow_blank=True, default="")
+    dong = serializers.CharField(required=False, allow_blank=True, default="")
+    months = serializers.IntegerField(required=False, default=24)
+    growth = serializers.FloatField(required=False, allow_null=True)        # 단지 상승률(소수)
+    dong_growth = serializers.FloatField(required=False, allow_null=True)   # 동 중앙값(소수)
+    gu_growth = serializers.FloatField(required=False, allow_null=True)     # 구 중앙값(소수)
+    verdict_label = serializers.CharField(required=False, allow_blank=True, default="")
+    jeonse_ratio = serializers.FloatField(required=False, allow_null=True)
+    recent_price = serializers.FloatField(required=False, allow_null=True)  # 최근 실거래(원)
+    area_py = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    build_year = serializers.IntegerField(required=False, allow_null=True)
+    confidence_tier = serializers.CharField(required=False, allow_blank=True, allow_null=True, default="")
+    window_trades = serializers.IntegerField(required=False, allow_null=True)
+
+
 class AnalyzeResponseSerializer(serializers.Serializer):
     breakeven_rate = serializers.FloatField()
     interest_breakeven = serializers.FloatField()

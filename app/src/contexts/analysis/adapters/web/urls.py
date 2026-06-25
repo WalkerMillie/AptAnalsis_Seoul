@@ -2,8 +2,9 @@
 
 from django.urls import path
 
-from contexts.analysis.adapters.web.views import AnalysisView
+from contexts.analysis.adapters.web.views import AICommentView, AnalysisView
 
 urlpatterns = [
     path("evaluate/", AnalysisView.as_view(), name="analysis_evaluate"),
+    path("ai_comment/", AICommentView.as_view(), name="analysis_ai_comment"),
 ]
