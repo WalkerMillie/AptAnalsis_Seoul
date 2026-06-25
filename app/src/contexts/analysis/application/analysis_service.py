@@ -49,7 +49,8 @@ class AnalysisService:
                 complex_id: str, as_of: date,
                 holding_years: float = 2.0, opportunity_rate: float = 0.03,
                 is_first_home: bool = True,
-                jeonse_ratio: float | None = None) -> AnalysisResult:
+                jeonse_ratio: float | None = None,
+                conversion_rate: float | None = None) -> AnalysisResult:
         # 총비용 모델(B안): 거래·보유·청산 비용 모두 반영. 가정상승률은 '연' 기준.
         outcome = total_net_profit(
             purchase_price=purchase_price, loan_amount=loan_amount, equity=equity,
@@ -61,17 +62,19 @@ class AnalysisService:
             effective_rate=effective_rate, holding_years=holding_years,
             opportunity_rate=opportunity_rate, is_first_home=is_first_home)
         # 자택 관점: 전세가율 거주가치 포함(없으면 0 → 투자관점과 동일).
+        # 전월세전환율은 입력 시만 전달(생략 → 도메인 기본 0.04 단일출처 사용).
         jr = jeonse_ratio or 0.0
+        conv_kw = {} if conversion_rate is None else {"conversion_rate": conversion_rate}
         outcome_res = total_net_profit(
             purchase_price=purchase_price, loan_amount=loan_amount, equity=equity,
             effective_rate=effective_rate, growth=assumed_growth,
             holding_years=holding_years, opportunity_rate=opportunity_rate,
-            is_first_home=is_first_home, jeonse_ratio=jr)
+            is_first_home=is_first_home, jeonse_ratio=jr, **conv_kw)
         breakeven_res = breakeven_growth(
             purchase_price=purchase_price, loan_amount=loan_amount, equity=equity,
             effective_rate=effective_rate, holding_years=holding_years,
             opportunity_rate=opportunity_rate, is_first_home=is_first_home,
-            jeonse_ratio=jr)
+            jeonse_ratio=jr, **conv_kw)
         interest_be = an_f01(loan_amount, purchase_price, effective_rate)  # 이자만(참고)
         stress = an_f04(effective_rate)
         max_loan = int(self._loan_limit.lookup(purchase_price, as_of))

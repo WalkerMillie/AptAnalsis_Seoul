@@ -432,6 +432,7 @@
             <div class="grow"><label>대출 금리 (0.045=4.5%)</label><input id="effective_rate" type="number" step="0.001" value="0.045"></div>
             <div class="grow"><label>보유 기간 (년)</label><input id="holding_years" type="number" step="0.5" value="2"></div>
             <div class="grow"><label>기회비용 수익률</label><input id="opportunity_rate" type="number" step="0.005" value="0.03"></div>
+            <div class="grow"><label>전월세전환율 (거주가치)</label><input id="conversion_rate" type="number" step="0.005" value="0.04"></div>
           </div>
           <div class="row" style="margin-top:10px; align-items:center">
             <div class="grow"><label>예상 연 상승률 (자동: 실제 추세)</label><input id="assumed_growth" type="number" step="0.001" value="0.05"></div>
@@ -637,7 +638,8 @@ $('dongSearch').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch();
 let curRegion=null, curDong=null, listMonths=24, _complexList=[];
 async function openDong(code, dong, autoCid){
   showView('analyze', false);     // 지도·추천에서 진입 시 분석 뷰로 전환
-  curRegion=code; curDong=dong;
+  curRegion=code; curDong=dong; curComplex=null;  // 새 동 → 이전 단지 선택 해제(URL stale cid 방지)
+  syncURL(true);                  // 동 컨텍스트로 새 history 엔트리(cid는 단지 선택 시 채움)
   $('district').value=code; await loadDongs(code); $('dong').value=dong;
   await loadComplexes();
   // 추천 리스트에서 특정 단지로 진입 시 자동 선택 + 분석.
@@ -670,7 +672,7 @@ async function loadComplexes(){
 }
 $('monthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   $('monthsSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on'); listMonths=+b.dataset.m; loadComplexes();
+  b.classList.add('on'); listMonths=+b.dataset.m; syncURL(); loadComplexes();
 });
 
 // ===== STEP 3 =====
@@ -679,6 +681,7 @@ async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
+  syncURL();                       // 단지 선택 → 현재 엔트리에 cid 반영(replace)
   const [series, growth, trades, jeonse, jeonseSeries, regsum] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
@@ -838,6 +841,7 @@ async function runAnalyze(){
     opportunity_rate:+$('opportunity_rate').value, is_first_home:$('is_first_home').checked,
     // 자택 거주가치 반영 — 단지 실측 전세가율(없으면 null=투자관점만).
     jeonse_ratio: (curJeonse && curJeonse.ratio!=null) ? curJeonse.ratio : null,
+    conversion_rate:+$('conversion_rate').value||null,   // 거주가치 전월세전환율(기본 0.04)
   };
   const r=await busy('계산 중…', ()=>jpost('/api/analysis/evaluate/', body));
   if(!r.ok){ $('verdictBar').innerHTML=`<div class="verdict bad"><span class="badge">ERROR</span><div class="msg">입력을 확인해 주세요<small>${JSON.stringify(r.data)}</small></div></div>`; return; }
@@ -946,6 +950,7 @@ async function runRanking(){
   h+='</tbody>';
   $('rankTbl').innerHTML = list.length? h : '<tbody><tr><td class="empty">조건에 맞는 단지가 없어요.</td></tr></tbody>';
   $('rankTbl').querySelectorAll('tr.clickable').forEach(tr=>tr.onclick=()=>openDong(tr.dataset.r, tr.dataset.d));
+  syncURL();                         // 렌더된 explore(table) 상태를 URL에 반영
 }
 $('rkMonthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   $('rkMonthsSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
@@ -989,6 +994,7 @@ async function renderMap(){
   $('mapBox').querySelectorAll('path').forEach(p=>p.onclick=()=>{
     const code=p.dataset.code; if(code) onGuClick(code, p.dataset.name);
   });
+  syncURL();                         // 렌더된 explore(map) 상태를 URL에 반영
 }
 async function onGuClick(code, name){
   const r=await jget('/api/market_data/dongs/?region_code='+code);
@@ -1149,6 +1155,7 @@ function renderReco(){
     el.onclick=()=>openDong(c.region_code, c.dong, c.complex_id);
     $('recoList').appendChild(el);
   });
+  syncURL();                         // 렌더된 reco 상태(기간·필터·프리셋)를 URL에 반영
 }
 // 가격 입력 환산 표시(8.5 → 8억5천) + 프리셋 칩 활성 표시
 function updatePriceEcho(){
@@ -1172,18 +1179,99 @@ $('recoMonthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 });
 
 // ===== 뷰 전환 (상단 탭) =====
+let _view='analyze';                                        // 현재 뷰(URL 경로와 동기)
 function showView(name, scroll=true){
+  _view = name;                                             // 현재 뷰(URL 경로와 동기)
   const id = 'v' + name[0].toUpperCase() + name.slice(1);   // analyze→vAnalyze
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on', v.id===id));
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.view===name));
   if(scroll) window.scrollTo({top:0, behavior:'smooth'});
 }
-document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+// ===== URL 라우팅 (path 기반) — 뷰=경로(/analyze·/explore·/reco), 상태=쿼리(rc·dong·cid·m) =====
+// 뷰별 데이터는 처음 진입할 때만 로드(lazy) → 첫 접속 시 무거운 전국 집계(추천·지도) 회피.
+const VIEWS=['analyze','explore','reco'];
+let _restoring=false;                       // 복원 중엔 URL 역기록 억제(루프 방지)
+const _loaded={explore:false, reco:false};  // 뷰 1회 로드 플래그(재방문은 캐시)
+function viewFromPath(){
+  const seg=location.pathname.replace(/^\/+/,'').split('/')[0];
+  return VIEWS.includes(seg)? seg : 'analyze';
+}
+function setMonthSeg(m){
+  $('monthsSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on', +x.dataset.m===m));
+}
+let _sliderBuilt=false;
+// 현재 화면 → URL. 뷰는 경로, 상태는 뷰별 쿼리(기본값은 생략해 URL 청결 유지).
+// analyze: 동·단지·월 / explore: map·table·기간·거래수 / reco: 기간·가격평형필터·활성프리셋.
+// (reco 수동 가중치는 URL 미반영 — 6개라 지저분. 프리셋이면 이름으로 복원, 수동은 기본값으로 리셋.)
+function syncURL(push=false){
+  if(_restoring) return;
+  const p=new URLSearchParams();
+  if(_view==='analyze'){
+    if(curRegion)  p.set('rc', curRegion);
+    if(curDong)    p.set('dong', curDong);
+    if(curComplex) p.set('cid', curComplex.complex_id);
+    if(listMonths) p.set('m', listMonths);
+  } else if(_view==='explore'){
+    if(curView==='table')      p.set('sub','table');     // map=기본 → 생략
+    if(rkMonths!==24)          p.set('rm', rkMonths);
+    const min=$('rkMin').value; if(min && min!=='10') p.set('min', min);
+  } else if(_view==='reco'){
+    if(recoMonths!==24) p.set('rm', recoMonths);
+    for(const [q,id] of [['pmin','fPriceMin'],['pmax','fPriceMax'],['amin','fAreaMin'],['amax','fAreaMax']]){
+      const v=$(id).value; if(v!=='') p.set(q, v);
+    }
+    const active=document.querySelector('#recoPresets button.on');
+    if(active) p.set('preset', active.dataset.name);
+  }
+  const s=p.toString(), url='/'+_view+(s?'?'+s:'');
+  push ? history.pushState(null,'',url) : history.replaceState(null,'',url);
+}
+function loadView(name){            // 현재 컨트롤 값으로 렌더(필요 시 fetch)
+  if(name==='explore'){ curView==='table'? runRanking() : renderMap(); }
+  else if(name==='reco'){ if(!_sliderBuilt){ buildWeightSliders(); _sliderBuilt=true; } loadCandidates(); }
+}
+function navView(name){             // 탭 이동: 뷰 표시 + 경로 push + 첫 진입 시 로드(lazy)
+  showView(name); syncURL(true);
+  if(name!=='analyze' && !_loaded[name]){ _loaded[name]=true; loadView(name); }
+}
+async function applyFromURL(){      // 현재 URL → 화면 복원(부팅·뒤로가기 공용)
+  _restoring=true;
+  try{
+    const view=viewFromPath(), p=new URLSearchParams(location.search);
+    showView(view, false);
+    if(view==='analyze'){
+      const rc=p.get('rc'), dong=p.get('dong'), cid=p.get('cid'), m=+p.get('m');
+      if(m){ listMonths=m; setMonthSeg(m); }
+      if(rc && dong) await openDong(rc, dong, cid||undefined);
+    } else if(view==='explore'){
+      curView = p.get('sub')==='table' ? 'table' : 'map';
+      const rm=+p.get('rm'); if(rm) rkMonths=rm;
+      const min=p.get('min'); if(min) $('rkMin').value=min;
+      $('rkMonthsSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on', +x.dataset.m===rkMonths));
+      $('viewSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.v===curView));
+      $('mapView').classList.toggle('hidden', curView!=='map');
+      $('tableView').classList.toggle('hidden', curView!=='table');
+      _loaded.explore=true; loadView('explore');
+    } else if(view==='reco'){
+      const rm=+p.get('rm'); if(rm) recoMonths=rm;
+      for(const [q,id] of [['pmin','fPriceMin'],['pmax','fPriceMax'],['amin','fAreaMin'],['amax','fAreaMax']]){
+        const v=p.get(q); if(v!=null) $(id).value=v;
+      }
+      $('recoMonthsSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on', +x.dataset.m===recoMonths));
+      if(!_sliderBuilt){ buildWeightSliders(); _sliderBuilt=true; }
+      const preset=p.get('preset'); if(preset){ const pp=RECO_PRESETS.find(x=>x.name===preset); if(pp) applyRecoPreset(pp); }
+      updatePriceEcho();
+      _loaded.reco=true; await loadCandidates();
+    }
+  } finally { _restoring=false; }
+}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>navView(b.dataset.view));
 // 키보드 F1/F2/F3 — 터미널 감성
 document.addEventListener('keydown',e=>{
   const map={F1:'analyze',F2:'explore',F3:'reco'};
-  if(map[e.key]){ e.preventDefault(); showView(map[e.key]); }
+  if(map[e.key]){ e.preventDefault(); navView(map[e.key]); }
 });
+window.addEventListener('popstate', applyFromURL);
 
 // ===== 테마(다크 ↔ 라이트=토스 핀테크 톤) =====
 const THEME_KEY='aptTheme';
@@ -1222,7 +1310,8 @@ function tick(){
 (async()=>{
   await loadDistricts(); loadDataInfo();
   tick(); setInterval(tick, 1000);
-  renderMap(); buildWeightSliders(); loadCandidates(); buildTicker();
+  buildTicker();              // 상단 티커는 전역 크롬 — 항상 로드
+  await applyFromURL();       // URL 기준 초기 뷰만 표시·로드(lazy) + 분석뷰 딥링크 복원
 })();
 </script>
 </body>

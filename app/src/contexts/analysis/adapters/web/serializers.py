@@ -16,6 +16,8 @@ class AnalyzeRequestSerializer(serializers.Serializer):
     is_first_home = serializers.BooleanField(required=False, default=True)  # 1주택(양도세 비과세 판정)
     # 전세가율(소수). 생략 시 뷰가 해당 단지 실거래로 자동 산정. 자택 거주가치 반영용.
     jeonse_ratio = serializers.FloatField(min_value=0, required=False, allow_null=True)
+    # 전월세전환율(소수). 거주가치 = 전세보증금 × 이 값. 생략 시 도메인 기본(0.04).
+    conversion_rate = serializers.FloatField(min_value=0, required=False, allow_null=True)
 
 
 class AnalyzeResponseSerializer(serializers.Serializer):

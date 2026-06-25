@@ -48,5 +48,6 @@ class AnalysisView(APIView):
             opportunity_rate=d.get("opportunity_rate", 0.03),
             is_first_home=d.get("is_first_home", True),
             jeonse_ratio=d.get("jeonse_ratio"),
+            conversion_rate=d.get("conversion_rate"),
         )
         return Response(AnalyzeResponseSerializer(asdict(result)).data)
