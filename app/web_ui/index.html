@@ -893,20 +893,31 @@ async function renderTransit(near){
   $('trInput').onkeydown=e=>{ if(e.key==='Enter'){ const v=e.target.value.trim(); if(v) runTransit({dest_q:v, label:v}, $('trGo')); } };
 }
 const _trLeg = l => l.type==='walk'?'':`<span class="tr-leg tr-${l.type}">${l.type==='subway'?'🚇':'🚌'} ${l.name}</span>`;
+const TRANSIT_CACHE_VER = 1;   // 노선/파싱 바뀌면 올려서 일괄 폐기(좌표 고정이라 평소 영구 보존)
+function renderTransitRoutes(res, r){
+  res.innerHTML=`<div class="tr-dest">→ <b>${esc(r.dest_label)}</b></div>`+
+    r.routes.map(rt=>`<div class="tr-route">
+      <div class="tr-rmain"><b class="tr-time">${rt.total_min}분</b>
+        <span class="tr-meta">환승 ${rt.transfers} · 도보 ${rt.walk_m}m · ${rt.payment.toLocaleString()}원</span></div>
+      <div class="tr-legs">${rt.legs.map(_trLeg).join('<span class="tr-arr">›</span>')}</div></div>`).join('');
+}
 async function runTransit(opt, btn){
   const box=$('transitBox'), res=$('trResult');
   const sx=+box.dataset.sx, sy=+box.dataset.sy;
   box.querySelectorAll('.tr-chip').forEach(b=>b.classList.toggle('active', b===btn));
+  // 캐시 키 = 단지 + 목적지(프리셋키 or 정규화 자유입력). 단지·목적지 일치 시에만 재사용 → ODsay 한도 보호.
+  const cid = (curComplex&&curComplex.complex_id)||'';
+  const destKey = opt.preset ? 'p:'+opt.preset : 'q:'+(opt.dest_q||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const cacheKey = cid+'|'+destKey;
+  const hit = cid ? Cache.get('transit', cacheKey, {version:TRANSIT_CACHE_VER}) : null;
+  if(hit && hit.ok){ renderTransitRoutes(res, hit); return; }
   res.innerHTML=`<div class="tr-load">${opt.label}까지 경로 찾는 중…</div>`;
   try{
     const r=await fetch('/api/analysis/transit/',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sx,sy,preset:opt.preset||'',dest_q:opt.dest_q||''})}).then(x=>x.json());
     if(!r.ok){ res.innerHTML=`<div class="tr-fail">${esc(r.message||'경로를 불러오지 못했어요.')}</div>`; return; }
-    res.innerHTML=`<div class="tr-dest">→ <b>${esc(r.dest_label)}</b></div>`+
-      r.routes.map((rt,i)=>`<div class="tr-route">
-        <div class="tr-rmain"><b class="tr-time">${rt.total_min}분</b>
-          <span class="tr-meta">환승 ${rt.transfers} · 도보 ${rt.walk_m}m · ${rt.payment.toLocaleString()}원</span></div>
-        <div class="tr-legs">${rt.legs.map(_trLeg).join('<span class="tr-arr">›</span>')}</div></div>`).join('');
+    if(cid) Cache.set('transit', cacheKey, r, {version:TRANSIT_CACHE_VER});   // 성공만 캐시
+    renderTransitRoutes(res, r);
   }catch(e){ res.innerHTML=`<div class="tr-fail">지금은 교통 경로를 불러오기 어려워요.</div>`; }
 }
 // 좌측 단지 리스트에서 해당 단지 포커싱 + 리스트 내부 자동 스크롤(페이지 점프 없음).
@@ -1077,16 +1088,49 @@ function renderAI(c, growth, regsum){
     area_py:(c.recent_area?py(c.recent_area):''), build_year:(c.build_year||null),
     confidence_tier:(growth.confidence_tier||c.confidence_tier||''),
     window_trades:(growth.window_trades||c.window_trades||c.trade_count||null) };
-  _aiKey = c.complex_id+'|'+(growth.months||listMonths);
+  // 입력 지문 포함 → 시세갱신·기간변경 등 입력이 바뀌면 자동 miss(stale 코멘트 방지).
+  const sig = hashStr(JSON.stringify([_aiCtx.growth,_aiCtx.dong_growth,_aiCtx.gu_growth,
+    _aiCtx.jeonse_ratio,_aiCtx.recent_price,_aiCtx.verdict_label,_aiCtx.window_trades,_aiCtx.confidence_tier]));
+  _aiKey = c.complex_id+'|'+(growth.months||listMonths)+'|'+sig;
   renderAICommentSlot();
 }
 
+// ===== 범용 클라이언트 캐시 (localStorage) =====
+// 네임스페이스별 버전·LRU 상한·선택적 TTL. 향후 다른 API 결과 적재도 store(ns,...)로 일반화.
+// 구조: localStorage["cache:<ns>"] = { v:<version>, items:{ <key>:{val, ts, at} } }
+const Cache = (()=>{
+  const PFX='cache:';
+  const load=ns=>{ try{ return JSON.parse(localStorage.getItem(PFX+ns))||{v:0,items:{}}; }catch(e){ return {v:0,items:{}}; } };
+  const evict=(db,n)=>{ const ks=Object.keys(db.items).sort((a,b)=>db.items[a].at-db.items[b].at);
+    for(let i=0;i<n && i<ks.length;i++) delete db.items[ks[i]]; };
+  const save=(ns,db)=>{ try{ localStorage.setItem(PFX+ns, JSON.stringify(db)); }
+    catch(e){ try{ evict(db, Math.ceil(Object.keys(db.items).length/2)); localStorage.setItem(PFX+ns, JSON.stringify(db)); }catch(_){} } };
+  return {
+    get(ns, key, {version=0, ttlMs=0}={}){
+      const db=load(ns); if(version && db.v!==version) return null;       // 버전 불일치 무효
+      const e=db.items[key]; if(!e) return null;
+      if(ttlMs && (Date.now()-e.ts)>ttlMs){ delete db.items[key]; save(ns,db); return null; }
+      e.at=Date.now(); save(ns,db);                                       // LRU 최근접근 갱신
+      return e.val;
+    },
+    set(ns, key, val, {version=0, cap=200}={}){
+      const db=load(ns); if(version && db.v!==version){ db.v=version; db.items={}; } // 버전업 → 일괄 폐기
+      db.items[key]={val, ts:Date.now(), at:Date.now()};
+      const ks=Object.keys(db.items); if(ks.length>cap) evict(db, ks.length-cap);
+      save(ns,db);
+    },
+    clear(ns){ try{ localStorage.removeItem(PFX+ns); }catch(e){} },
+  };
+})();
+// 짧은 문자열 해시(djb2) — 캐시 키 입력값 지문용.
+function hashStr(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); }
+
 // ===== AI 코멘트(온디맨드, LLM) =====
-const _aiCache = {};          // key: complex_id|months → {ok,headline,reading,caution}
+const AI_CACHE_VER = 1;       // 스키마/프롬프트 바뀌면 올려서 일괄 폐기
 let _aiCtx = null, _aiKey = null;
 function renderAICommentSlot(){
   const slot = $('aiComment'); if(!slot) return;
-  const cached = _aiCache[_aiKey];
+  const cached = Cache.get('ai', _aiKey, {version:AI_CACHE_VER});
   if(cached && cached.ok){ slot.innerHTML = aiCommentHTML(cached); return; }
   slot.innerHTML = `<button class="ai-cgen" id="aiGenBtn"><span class="ai-spark">✦</span> AI 코멘트 생성</button>`;
   $('aiGenBtn').onclick = genAIComment;
@@ -1115,7 +1159,7 @@ async function genAIComment(){
     r = res.ok ? await res.json() : {ok:false, message:'지금은 AI 코멘트를 만들기 어려워요. 잠시 후 다시 시도해 주세요.'};
   }catch(e){ r = {ok:false, message:'네트워크 문제로 코멘트를 못 받았어요. 잠시 후 다시 시도해 주세요.'}; }
   if($('aiComment')!==slot) return;     // 그새 다른 단지로 이동 → 무시
-  if(r && r.ok){ _aiCache[key]=r; slot.innerHTML = aiCommentHTML(r); }
+  if(r && r.ok){ Cache.set('ai', key, r, {version:AI_CACHE_VER}); slot.innerHTML = aiCommentHTML(r); }
   else {
     slot.innerHTML = `<div class="ai-cfail"><span>${esc(r&&r.message||'AI 응답을 받지 못했어요.')}</span>
       <button id="aiRetryBtn">다시 시도</button></div>`;
