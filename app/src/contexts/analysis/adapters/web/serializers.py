@@ -38,6 +38,16 @@ class AICommentRequestSerializer(serializers.Serializer):
     window_trades = serializers.IntegerField(required=False, allow_null=True)
 
 
+class TransitRequestSerializer(serializers.Serializer):
+    """온디맨드 대중교통 소요시간 — 출발(단지 좌표) + 목적지(프리셋/자유입력/좌표)."""
+    sx = serializers.FloatField()   # 출발 경도
+    sy = serializers.FloatField()   # 출발 위도
+    preset = serializers.CharField(required=False, allow_blank=True, default="")
+    dest_q = serializers.CharField(required=False, allow_blank=True, default="")
+    ex = serializers.FloatField(required=False, allow_null=True)  # 목적지 경도(직접)
+    ey = serializers.FloatField(required=False, allow_null=True)  # 목적지 위도(직접)
+
+
 class AnalyzeResponseSerializer(serializers.Serializer):
     breakeven_rate = serializers.FloatField()
     interest_breakeven = serializers.FloatField()

@@ -367,7 +367,46 @@
   /* 인근 지하철역 칩 */
   .chip.rail{ color:var(--blue); border-color:color-mix(in srgb,var(--blue) 45%,var(--line));
     font-weight:600; background:color-mix(in srgb,var(--blue) 8%,transparent); cursor:default; }
+  /* 미니지도(카카오맵 SDK) */
+  #miniMap{ height:230px; width:100%; background:var(--bg-2); }
+  /* 마커 = 컬러 점 + 흰 테두리(지도 위에서 또렷하게, 아이콘 없음) */
+  .mk{ border-radius:50%; border:2.5px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,.5); }
+  .mk-home{ width:18px; height:18px; background:var(--blue); }
+  .mk-rail{ width:14px; height:14px; background:#e8470f; }
+  .map-foot{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:9px 13px; font-size:11px; color:var(--txt-dim); font-family:var(--mono); }
+  .map-foot a{ color:var(--blue); text-decoration:none; font-weight:700; }
+  .map-foot a:hover{ text-decoration:underline; }
+  /* 대중교통 소요시간(온디맨드) */
+  .transit-box{ padding:11px 13px 13px; border-top:1px solid var(--line); }
+  .transit-box:empty{ display:none; }
+  .tr-head{ font-size:12px; font-weight:800; color:var(--txt); margin-bottom:9px; }
+  .tr-head .tr-sub{ font-weight:500; color:var(--txt-dim); font-size:11px; margin-left:4px; }
+  .tr-presets{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .tr-chip{ border:1px solid var(--line); background:var(--bg-2); color:var(--txt);
+    border-radius:999px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; transition:.12s; }
+  .tr-chip:hover{ border-color:var(--blue); color:var(--blue); }
+  .tr-chip.active{ background:var(--blue); color:#fff; border-color:var(--blue); }
+  .tr-go{ font-weight:800; }
+  .tr-input{ flex:1; min-width:130px; border:1px solid var(--line); background:var(--bg-2);
+    color:var(--txt); border-radius:8px; padding:5px 10px; font-size:12px; font-family:inherit; }
+  .tr-input:focus{ outline:none; border-color:var(--blue); }
+  .tr-result{ margin-top:10px; }
+  .tr-load{ font-size:12px; color:var(--txt-dim); padding:6px 2px; }
+  .tr-fail{ font-size:12px; color:var(--amber,#c97a17); padding:6px 2px; }
+  .tr-dest{ font-size:12px; color:var(--txt-dim); margin-bottom:6px; }
+  .tr-route{ border:1px solid var(--line); border-radius:10px; padding:8px 11px; margin-bottom:7px; background:var(--bg-2); }
+  .tr-rmain{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+  .tr-time{ font-size:16px; font-weight:800; color:var(--blue); }
+  .tr-meta{ font-size:11px; color:var(--txt-dim); font-family:var(--mono); }
+  .tr-legs{ display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .tr-leg{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; }
+  .tr-subway{ background:color-mix(in srgb,var(--blue) 16%,transparent); color:var(--blue); }
+  .tr-bus{ background:color-mix(in srgb,#1aa251 18%,transparent); color:#1aa251; }
+  .tr-arr{ color:var(--txt-dim); font-size:12px; }
 </style>
+<!-- 카카오맵 SDK(JS키, 도메인잠금). autoload=false → kakao.maps.load()로 초기화 제어. -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=57fb6b762a88ac98733d0ab5128c461d&autoload=false"></script>
 </head>
 <body>
 
@@ -536,6 +575,12 @@
       <div class="panel rail">
         <div class="phead"><span class="acc"></span>신뢰도 · 데이터</div>
         <div id="railConf"><div class="empty">—</div></div>
+      </div>
+      <div class="panel hidden" id="mapPanel">
+        <div class="phead"><span class="acc" style="background:var(--blue)"></span>위치 · 인근 지하철 <span class="r">KAKAOMAP</span></div>
+        <div id="miniMap"></div>
+        <div class="map-foot" id="mapFoot"></div>
+        <div class="transit-box" id="transitBox"></div>
       </div>
     </div>
   </div>
@@ -757,32 +802,131 @@ $('monthsSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 });
 
 // ===== STEP 3 =====
-let curComplex=null, curGrowth=null, curJeonse=null;
+let curComplex=null, curGrowth=null, curJeonse=null, curGeo=null;
 // 동 중심 기준 최근접 지하철역(키리스 정적표) — 1회 fetch 후 캐시.
-let _subwayNear=null;
-async function ensureSubway(){
-  if(_subwayNear) return _subwayNear;
-  try{ _subwayNear = await jget('/data/subway_near.json'); }
-  catch(e){ _subwayNear = {}; }
-  window._subwayNear = _subwayNear; return _subwayNear;
+// 단지별 정확좌표·전노선 최근접역(Kakao 배치 산출). 단건 fetch·캐시. 없으면 null(지도 숨김).
+let _geoCache={};
+async function ensureGeo(cid){
+  if(cid in _geoCache) return _geoCache[cid];
+  try{ const r=await jget('/data/complex_geo?cid='+encodeURIComponent(cid)); _geoCache[cid]= (r&&r.found)?r:null; }
+  catch(e){ _geoCache[cid]=null; }
+  return _geoCache[cid];
+}
+
+// 카카오맵 SDK 1회 로드(autoload=false). 도메인 미등록/네트워크 실패 시 reject → 지도만 숨김.
+let _kakaoReady=null;
+function ensureKakao(){
+  if(_kakaoReady) return _kakaoReady;
+  _kakaoReady=new Promise((res,rej)=>{
+    if(typeof kakao==='undefined' || !kakao.maps){ rej('kakao sdk 미로드'); return; }
+    if(kakao.maps.Map){ res(); return; }            // 이미 로드됨
+    kakao.maps.load(()=>res());
+  });
+  return _kakaoReady;
+}
+
+// 미니지도(카카오맵). 단지=정확좌표(드물게 동근사), 역=정확좌표. 인스턴스 재사용.
+let _kMap=null, _kOverlays=[];
+async function renderMiniMap(name, near, q){
+  const panel=$('mapPanel');
+  if(!near || near.lat==null){ panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  const approx = !!near.approx;                              // true=동 중심 근사(드뭄)
+  const locTxt = approx ? '동 중심 근사' : (near.road || '정확 위치');
+  // 푸터·교통 UI는 지도 SDK와 무관하게 먼저 노출
+  const dt = near.dist_m<1000 ? near.dist_m+'m' : (near.dist_m/1000).toFixed(1)+'km';
+  $('mapFoot').innerHTML = (near.station?`<span>🚇 ${near.station} ${near.line} · 약 ${dt}${approx?' · 동 중심 근사':''}</span>`:`<span>${locTxt}</span>`)+
+    `<a href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener">네이버지도 ↗</a>`;
+  renderTransit(near);
+  // 지도 캔버스
+  try{ await ensureKakao(); }
+  catch(e){ console.warn('카카오맵 로드 실패:', e); $('miniMap').style.display='none'; return; }
+  $('miniMap').style.display='';
+  const home=new kakao.maps.LatLng(near.lat, near.lng);
+  if(!_kMap){
+    _kMap=new kakao.maps.Map($('miniMap'), {center:home, level:5});
+    _kMap.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+  }
+  _kOverlays.forEach(o=>o.setMap(null)); _kOverlays=[];
+  const mk=(pos,cls,tip)=>{
+    const el=document.createElement('div'); el.className='mk '+cls; el.title=tip;
+    const ov=new kakao.maps.CustomOverlay({position:pos, content:el, yAnchor:0.5, xAnchor:0.5, zIndex:5});
+    ov.setMap(_kMap); _kOverlays.push(ov);
+  };
+  mk(home,'mk-home',`${name} · ${locTxt}`);
+  if(near.slat!=null){
+    const rail=new kakao.maps.LatLng(near.slat, near.slng);
+    mk(rail,'mk-rail',`${near.station} ${near.line}`);
+    const line=new kakao.maps.Polyline({path:[home,rail], strokeWeight:3, strokeColor:'#5b9dff',
+      strokeOpacity:0.9, strokeStyle:'dash'});
+    line.setMap(_kMap); _kOverlays.push(line);
+    const b=new kakao.maps.LatLngBounds(); b.extend(home); b.extend(rail);
+    _kMap.setBounds(b, 40, 40, 40, 40);
+  } else { _kMap.setCenter(home); _kMap.setLevel(4); }
+  setTimeout(()=>{ _kMap.relayout(); if(near.slat!=null){ const b=new kakao.maps.LatLngBounds(); b.extend(home); b.extend(new kakao.maps.LatLng(near.slat,near.slng)); _kMap.setBounds(b,40,40,40,40);} else _kMap.setCenter(home); },60);
+}
+
+// ── 대중교통 소요시간(ODsay, 온디맨드) ──
+let _transitPresets=null;
+async function ensureTransitPresets(){
+  if(_transitPresets) return _transitPresets;
+  try{ const r=await jget('/api/analysis/transit/'); _transitPresets=r.presets||[]; }
+  catch(e){ _transitPresets=[]; }
+  return _transitPresets;
+}
+async function renderTransit(near){
+  const box=$('transitBox'); if(!box) return;
+  if(!near || near.lng==null){ box.innerHTML=''; return; }
+  const presets=await ensureTransitPresets();
+  if(!presets.length){ box.innerHTML=''; return; }   // 키 미설정 등 → 섹션 숨김
+  box.dataset.sx=near.lng; box.dataset.sy=near.lat;
+  box.innerHTML=`<div class="tr-head">🚆 대중교통 소요시간 <span class="tr-sub">목적지 선택</span></div>
+    <div class="tr-presets">${presets.map(p=>`<button class="tr-chip" data-k="${p.key}">${p.label}</button>`).join('')}
+      <input class="tr-input" id="trInput" placeholder="직접 입력(예: 판교역, 강남세브란스)" />
+      <button class="tr-chip tr-go" id="trGo">조회</button></div>
+    <div class="tr-result" id="trResult"></div>`;
+  box.querySelectorAll('.tr-chip[data-k]').forEach(b=>b.onclick=()=>runTransit({preset:b.dataset.k, label:b.textContent}, b));
+  $('trGo').onclick=()=>{ const v=$('trInput').value.trim(); if(v) runTransit({dest_q:v, label:v}, $('trGo')); };
+  $('trInput').onkeydown=e=>{ if(e.key==='Enter'){ const v=e.target.value.trim(); if(v) runTransit({dest_q:v, label:v}, $('trGo')); } };
+}
+const _trLeg = l => l.type==='walk'?'':`<span class="tr-leg tr-${l.type}">${l.type==='subway'?'🚇':'🚌'} ${l.name}</span>`;
+async function runTransit(opt, btn){
+  const box=$('transitBox'), res=$('trResult');
+  const sx=+box.dataset.sx, sy=+box.dataset.sy;
+  box.querySelectorAll('.tr-chip').forEach(b=>b.classList.toggle('active', b===btn));
+  res.innerHTML=`<div class="tr-load">${opt.label}까지 경로 찾는 중…</div>`;
+  try{
+    const r=await fetch('/api/analysis/transit/',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sx,sy,preset:opt.preset||'',dest_q:opt.dest_q||''})}).then(x=>x.json());
+    if(!r.ok){ res.innerHTML=`<div class="tr-fail">${esc(r.message||'경로를 불러오지 못했어요.')}</div>`; return; }
+    res.innerHTML=`<div class="tr-dest">→ <b>${esc(r.dest_label)}</b></div>`+
+      r.routes.map((rt,i)=>`<div class="tr-route">
+        <div class="tr-rmain"><b class="tr-time">${rt.total_min}분</b>
+          <span class="tr-meta">환승 ${rt.transfers} · 도보 ${rt.walk_m}m · ${rt.payment.toLocaleString()}원</span></div>
+        <div class="tr-legs">${rt.legs.map(_trLeg).join('<span class="tr-arr">›</span>')}</div></div>`).join('');
+  }catch(e){ res.innerHTML=`<div class="tr-fail">지금은 교통 경로를 불러오기 어려워요.</div>`; }
 }
 async function selectComplex(c, el){
   document.querySelectorAll('#complexes .citem').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   curComplex=c;
   syncURL();                       // 단지 선택 → 현재 엔트리에 cid 반영(replace)
-  const [series, growth, trades, jeonse, jeonseSeries, regsum, _sw] = await busy('이 단지 분석 중…', ()=>Promise.all([
+  const [series, growth, trades, jeonse, jeonseSeries, regsum, geo] = await busy('이 단지 분석 중…', ()=>Promise.all([
     jget(`/api/market_data/price_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/price_growth/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     jget(`/api/market_data/trades/?complex_id=${encodeURIComponent(c.complex_id)}`),
     jget(`/api/market_data/jeonse_ratio/?complex_id=${encodeURIComponent(c.complex_id)}&months=12`),
     jget(`/api/market_data/jeonse_series/?complex_id=${encodeURIComponent(c.complex_id)}&months=${listMonths}`),
     getRegsum(),
-    ensureSubway(),
+    ensureGeo(c.complex_id),
   ]), c.apt_name);
   curGrowth=growth; curJeonse=jeonse;
+  // 단지 정확좌표·최근접역. renderHero/지도/교통 공통 소스(없으면 지도 숨김).
+  curGeo = geo || null;
   const latest = (trades.trades||[])[0];
   renderHero(c, series, growth, latest, jeonse);
+  const _mq = encodeURIComponent(((districtName[curRegion]||'')+' '+(curDong||'')+' '+c.apt_name).trim()+' 아파트');
+  renderMiniMap(c.apt_name, curGeo, _mq);
   renderAI(c, growth, regsum);
   // 매매 + 전세 추세 차트(같은 평형 기준). 전세 표본 없으면 매매만.
   let charts = `<div class="note" style="margin:2px 0 2px; color:var(--txt-dim)">매매 평당 시세 (${series.band_m2?py(series.band_m2):'-'})</div>` + lineChart(series.series);
@@ -815,9 +959,9 @@ function renderHero(c, series, growth, latest, jeonse){
   const g = growth && growth.growth!=null ? growth.growth : null;
   const bigEok = latest ? (latest.price/EOK) : null;
   const q = encodeURIComponent(((districtName[curRegion]||'')+' '+(curDong||'')+' '+c.apt_name).trim()+' 아파트');
-  const near = (_subwayNear||{})[curRegion+'|'+curDong];
+  const near = curGeo;   // 정확좌표 우선(없으면 동근사). selectComplex에서 세팅.
   const distTxt = d => d<1000 ? d+'m' : (d/1000).toFixed(1)+'km';
-  const railChip = near ? `<span class="chip rail" title="${curDong} 중심 기준 약 ${distTxt(near.dist_m)}${near.approx?' · 구 중심 근사':''} · 1~8호선 기준">🚇 ${near.station} ${near.line} · ${distTxt(near.dist_m)}</span>` : '';
+  const railChip = (near && near.station) ? `<span class="chip rail" title="단지 기준 약 ${distTxt(near.dist_m)}${near.approx?' · 동 중심 근사':''} · 전 노선">🚇 ${near.station} ${near.line} · ${distTxt(near.dist_m)}</span>` : '';
   $('heroBox').innerHTML = `<div class="hero-top">
     <div class="hero-id">
       <h1>${c.apt_name} <span class="mute" style="font-size:13px; font-weight:400">${curDong}</span></h1>
@@ -827,7 +971,6 @@ function renderHero(c, series, growth, latest, jeonse){
         ${by?`<span class="chip">🏗 ${by}년 · ${2026-by}년차</span>`:''}
         ${jr?`<span class="chip b">전세가율 ${pct(jr.ratio)}</span>`:''}
         ${railChip}
-        <a class="chip nv" href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener" title="네이버 지도에서 이 단지 보기">🗺 네이버지도 ↗</a>
         <a class="chip nv" href="https://search.naver.com/search.naver?query=${q}" target="_blank" rel="noopener" title="네이버에서 이 단지 검색">네이버 ↗</a>
       </div>
     </div>

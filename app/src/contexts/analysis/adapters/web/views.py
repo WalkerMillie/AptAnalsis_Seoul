@@ -10,19 +10,22 @@ from datetime import date
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from contexts.analysis.application import AICommentService, AnalysisService
+from contexts.analysis.application import AICommentService, AnalysisService, TransitService
 from contexts.analysis.adapters.an_dt01_loader import load_an_dt01_table
 from contexts.analysis.adapters.an_dt02_loader import load_an_dt02_table
 from contexts.analysis.adapters.llm_cli import make_llm_client
+from contexts.analysis.adapters.odsay_client import make_kakao_client, make_odsay_client
 from contexts.analysis.adapters.web.serializers import (
     AICommentRequestSerializer,
     AnalyzeRequestSerializer,
     AnalyzeResponseSerializer,
+    TransitRequestSerializer,
 )
 
 # 합성 루트: 어댑터 로더로 표를 만들어 유스케이스에 주입(한 번만 로드).
 _service = None
 _ai_service = None
+_transit_service = None
 
 
 def get_service() -> AnalysisService:
@@ -37,6 +40,13 @@ def get_ai_service() -> AICommentService:
     if _ai_service is None:
         _ai_service = AICommentService(make_llm_client())
     return _ai_service
+
+
+def get_transit_service() -> TransitService:
+    global _transit_service
+    if _transit_service is None:
+        _transit_service = TransitService(make_odsay_client(), make_kakao_client())
+    return _transit_service
 
 
 class AnalysisView(APIView):
@@ -70,4 +80,21 @@ class AICommentView(APIView):
         req = AICommentRequestSerializer(data=request.data)
         req.is_valid(raise_exception=True)
         result = get_ai_service().comment(dict(req.validated_data))
+        return Response(asdict(result))
+
+
+class TransitView(APIView):
+    """온디맨드 대중교통 소요시간(ODsay). 실패해도 200 + {ok:false, message}."""
+
+    def get(self, request):
+        # 프리셋 목록 노출(FE 버튼). 키 없어도 목록은 반환.
+        return Response({"presets": get_transit_service().presets()})
+
+    def post(self, request):
+        req = TransitRequestSerializer(data=request.data)
+        req.is_valid(raise_exception=True)
+        d = req.validated_data
+        result = get_transit_service().routes(
+            d["sx"], d["sy"], preset=d.get("preset", ""), dest_q=d.get("dest_q", ""),
+            ex=d.get("ex"), ey=d.get("ey"))
         return Response(asdict(result))
