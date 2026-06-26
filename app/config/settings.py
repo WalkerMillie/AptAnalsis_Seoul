@@ -11,9 +11,13 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR / "src"))
 
-# .env 로더(의존성 없이) — KEY=VALUE 줄을 os.environ에 주입(기존 값 우선).
-_env_file = BASE_DIR / ".env"
-if _env_file.exists():
+# env 로더(의존성 없이) — KEY=VALUE 줄을 os.environ에 주입(setdefault=먼저 들어온 값 우선).
+# 우선순위: 실제 프로세스 env > local.env(커밋 금지·비밀/로컬 오버라이드) > .env(커밋됨).
+# local.env를 먼저 읽어 .env의 동일 키를 이긴다(먼저 setdefault된 값이 남으므로).
+for _name in ("local.env", ".env"):
+    _env_file = BASE_DIR / _name
+    if not _env_file.exists():
+        continue
     for _line in _env_file.read_text(encoding="utf-8").splitlines():
         _line = _line.strip()
         if _line and not _line.startswith("#") and "=" in _line:
@@ -40,18 +44,34 @@ MIDDLEWARE = [
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
-# 분석 엔드포인트는 DB가 필요 없지만 Django는 기본 DB 설정을 요구한다(dev sqlite).
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        # 기본은 기존과 동일(BASE_DIR/db.sqlite3). DB_PATH 환경변수로 덮어쓰면
-        # 컨테이너에서 마운트 볼륨(/data 등)에 DB를 둬 재기동 간 영속 가능.
-        "NAME": os.environ.get("DB_PATH") or (BASE_DIR / "db.sqlite3"),
-        # 수집(쓰기)과 조회/기동(읽기)이 겹칠 때 'database is locked'로 죽지 않고 대기.
-        # SQLite 동시성 한계 완화용. 운영 PostgreSQL 전환 시 불필요.
-        "OPTIONS": {"timeout": 30},
-    },
-}
+# DB 선택: POSTGRES_DB가 env에 있으면 PostgreSQL, 없으면 기존 sqlite 폴백.
+# 로컬은 local.env에 POSTGRES_* 를 넣어 도커 postgres(영속)에 붙는다 → 세션 간 데이터 유지.
+if os.environ.get("POSTGRES_DB"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["POSTGRES_DB"],
+            "USER": os.environ.get("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+            "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+            # 요청 간 커넥션 재사용(매 요청 새 연결 비용 절감). 0이면 매번 새로.
+            "CONN_MAX_AGE": int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+        },
+    }
+else:
+    # 분석 엔드포인트는 DB가 필요 없지만 Django는 기본 DB 설정을 요구한다(dev sqlite).
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            # 기본은 기존과 동일(BASE_DIR/db.sqlite3). DB_PATH 환경변수로 덮어쓰면
+            # 컨테이너에서 마운트 볼륨(/data 등)에 DB를 둬 재기동 간 영속 가능.
+            "NAME": os.environ.get("DB_PATH") or (BASE_DIR / "db.sqlite3"),
+            # 수집(쓰기)과 조회/기동(읽기)이 겹칠 때 'database is locked'로 죽지 않고 대기.
+            # SQLite 동시성 한계 완화용. PostgreSQL에선 불필요.
+            "OPTIONS": {"timeout": 30},
+        },
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],

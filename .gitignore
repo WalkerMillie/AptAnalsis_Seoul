@@ -9,6 +9,9 @@ db.sqlite3-wal
 db.sqlite3-shm
 
 # 주의: app/.env는 의도적으로 커밋함(무료 공공 MOLIT 키, data.go.kr에서 재발급 가능).
+# local.env는 로컬 전용 비밀·오버라이드(Postgres 접속정보 등) — 커밋 금지.
+local.env
+app/local.env
 
 # Playwright MCP 임시 산출물
 .playwright-mcp/
