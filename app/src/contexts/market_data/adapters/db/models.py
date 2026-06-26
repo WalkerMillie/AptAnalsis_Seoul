@@ -49,16 +49,19 @@ class RentRecord(models.Model):
         indexes = [models.Index(fields=["contract_date"], name="ix_rent_cd")]
 
 
-class TickerSnapshot(models.Model):
-    """상단 티커(전광판) 일일 스냅샷. 매일 첫 호출 때만 1회 생성, 이후는 읽기만.
+class AggregateSnapshot(models.Model):
+    """전국 집계 결과의 캐시 스냅샷(티커·rankings·region_summary·candidates 공용).
 
-    티커가 매 페이지 진입마다 전국 풀스캔 집계(rankings·region_summary @24mo)를
-    재계산하던 비용 제거 — backfill 사이엔 안 바뀌는 값이라 하루 1회면 충분.
-    payload = {"movers":[{apt_name,growth}...30], "regions":{code:{median_growth}}}.
+    payload = 라이브 함수 출력을 '그대로' 얼린 값(재구현 아님). data_version과
+    logic_version이 둘 다 현재값과 일치할 때만 사용 — 데이터가 늘거나(backfill/갱신)
+    계산 로직(AGG_LOGIC_VERSION)이 바뀌면 자동 무효 → 다음 요청이 1회 재계산.
+    cache_key 예: "rankings|m=120|mt=10|lim=100", "ticker".
     """
-    snapshot_date = models.DateField(unique=True)
+    cache_key = models.CharField(max_length=120, unique=True)
+    data_version = models.CharField(max_length=40)   # 마지막으로 행이 늘어난 수집 시각(ISO) 또는 "v0"
+    logic_version = models.IntegerField()            # 계산 로직 버전(코드 상수). 로직 변경 시 ↑
     payload = models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now=True)
 
 
 class CollectionJobRecord(models.Model):

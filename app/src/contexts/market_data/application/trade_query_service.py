@@ -23,6 +23,11 @@ _MIN_RATIO_SEG = 3   # 전세가율: 같은 평형의 매매·전세 각 최소 
 _INSUFFICIENT = (f"표본 부족(거래월 {_MIN_MONTHS}개·거래 {_MIN_TRADES}건·양끝 각 {_MIN_SEG}건·"
                  f"같은 평형 양끝 각 {_MIN_BAND_SEG}건 비교 가능해야 함)")
 
+# 전국 집계 스냅샷 캐시의 '로직 버전'. _growth_from_points/게이트/대표평형 산정 등
+# 결과 수치에 영향 주는 계산 로직을 바꾸면 반드시 +1 → 기존 스냅샷 전부 자동 무효(재계산).
+# (데이터 변경은 data_version이 잡고, 로직 변경은 이 상수가 잡는다 — 2축 무효화.)
+AGG_LOGIC_VERSION = 1
+
 
 def _tier(score: float) -> str:
     return "높음" if score >= 0.7 else "보통" if score >= 0.4 else "낮음"
@@ -366,35 +371,52 @@ class TradeQueryService:
         return {"months": months, "min_trades": min_trades,
                 "total": len(out), "candidates": out[:limit]}
 
-    # 티커 스냅샷 기준 윈도우(상단 전광판 전용, 고정). 사용자 기간(months)과 무관.
+    # ── 전국 집계 스냅샷 캐시 ──────────────────────────────────────────
+    # 무거운 전국 집계 3종(+티커)의 결과를 (data_version, logic_version) 키로 얼린다.
+    # 둘 다 일치하면 즉답, 아니면 라이브 함수를 '그대로' 1회 호출해 저장(재구현 없음 →
+    # 캐시값 = 라이브값 보장). 파라미터 공간이 작고(기간 5종 등) backfill 사이 불변이라
+    # 결과 스냅샷이 가장 효율적. store가 스냅샷 포트 없으면(인메모리) 라이브 폴백.
     _TICKER_MONTHS = 24
     _TICKER_TOP = 30
 
-    def ticker(self, day) -> dict:
-        """상단 티커 payload — 그날 스냅샷 있으면 그대로, 없으면 1회 계산 후 저장.
+    def _cached(self, cache_key: str, compute):
+        store = self._store
+        if not (hasattr(store, "data_version") and hasattr(store, "agg_snapshot")):
+            return compute()                       # 폴백: 버전/스냅샷 포트 없는 스토어
+        dv = store.data_version()
+        snap = store.agg_snapshot(cache_key)
+        if (snap is not None and snap["data_version"] == dv
+                and snap["logic_version"] == AGG_LOGIC_VERSION):
+            return snap["payload"]                 # 데이터·로직 둘 다 그대로 → 얼린 값
+        payload = compute()                        # 라이브 함수 그대로(재구현 X)
+        if hasattr(store, "save_agg_snapshot"):
+            store.save_agg_snapshot(cache_key, dv, AGG_LOGIC_VERSION, payload)
+        return payload
 
-        매 페이지 진입마다 전국 풀스캔 2종(rankings·region_summary @24mo)을 재계산하던 걸
-        하루 1회로 줄인다(backfill 사이 불변). 데이터는 가볍게 급등 상위 30 + 구별 중앙값만.
-        store가 스냅샷 포트를 구현하지 않으면(인메모리 등) 매번 즉석 계산으로 폴백.
-        """
-        get_snap = getattr(self._store, "ticker_snapshot", None)
-        if get_snap is not None:
-            cached = get_snap(day)
-            if cached is not None:
-                return cached
+    def rankings_cached(self, months: int = 12, min_trades: int = 10, limit: int = 100) -> dict:
+        return self._cached(f"rankings|m={months}|mt={min_trades}|lim={limit}",
+                            lambda: self.rank_complexes(months, min_trades, limit))
+
+    def region_summary_cached(self, months: int = 12, min_trades: int = 10) -> dict:
+        return self._cached(f"region_summary|m={months}|mt={min_trades}",
+                            lambda: self.region_summary(months, min_trades))
+
+    def candidates_cached(self, months: int = 12, min_trades: int = 10, limit: int = 2000) -> dict:
+        return self._cached(f"candidates|m={months}|mt={min_trades}|lim={limit}",
+                            lambda: self.candidate_metrics(months, min_trades, limit))
+
+    def _ticker_payload(self) -> dict:
+        """티커 원본 계산(급등 상위 30 + 구별 중앙값). 캐시·shadow검증 공용."""
         rk = self.rank_complexes(months=self._TICKER_MONTHS, min_trades=10,
                                  limit=self._TICKER_TOP)
         rs = self.region_summary(months=self._TICKER_MONTHS, min_trades=10)
-        payload = {
-            "date": day.isoformat() if hasattr(day, "isoformat") else str(day),
-            "movers": [{"apt_name": c["apt_name"], "growth": c["growth"]}
-                       for c in rk.get("ranked", [])],
-            "regions": rs.get("regions", {}),
-        }
-        save_snap = getattr(self._store, "save_ticker_snapshot", None)
-        if save_snap is not None:
-            save_snap(day, payload)
-        return payload
+        return {"movers": [{"apt_name": c["apt_name"], "growth": c["growth"]}
+                           for c in rk.get("ranked", [])],
+                "regions": rs.get("regions", {})}
+
+    def ticker(self) -> dict:
+        """상단 티커 payload — data_version 키 캐시. 갱신 시 자동 무효(즉시 최신 반영)."""
+        return self._cached("ticker", self._ticker_payload)
 
     def region_summary(self, months: int = 12, min_trades: int = 10) -> dict:
         """구(region_code)별 단지 상승률 중앙값 — 지도 색칠(choropleth)용.

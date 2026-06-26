@@ -14,7 +14,7 @@ from django.db.models import Count, Max
 from contexts.market_data.domain.trade import Trade
 from contexts.market_data.domain.jeonse_trade import JeonseTrade
 from contexts.market_data.adapters.db.models import (
-    CollectionJobRecord, TradeRecord, RentRecord, TickerSnapshot)
+    CollectionJobRecord, TradeRecord, RentRecord, AggregateSnapshot)
 
 
 class DjangoTradeStore:
@@ -149,12 +149,27 @@ class DjangoTradeStore:
                     .filter(area_m2__gt=0, contract_date__gte=start)
                     .values_list("complex_id", "area_m2", "deposit"))
 
-    def ticker_snapshot(self, day: date) -> dict | None:
-        """그날(day) 티커 스냅샷 payload — 없으면 None(서비스가 생성)."""
-        row = TickerSnapshot.objects.filter(snapshot_date=day).first()
-        return row.payload if row else None
+    def data_version(self) -> str:
+        """데이터가 마지막으로 '실제로 늘어난' 수집 시각(ISO). 없으면 "v0".
 
-    def save_ticker_snapshot(self, day: date, payload: dict) -> None:
-        """그날 스냅샷 저장(동시 첫 호출 경합은 unique로 흡수 — 먼저 쓴 게 남음)."""
-        TickerSnapshot.objects.get_or_create(
-            snapshot_date=day, defaults={"payload": payload})
+        싼 probe(수집작업 메타는 행 수십 개) — 매 요청 COUNT(수십만행) 없이 ~1ms에
+        '데이터 바뀌었나'를 판정. fetched_count>0 만 봐서 빈 갱신은 버전 안 올림."""
+        v = (CollectionJobRecord.objects.filter(fetched_count__gt=0)
+             .aggregate(v=Max("updated_at"))["v"])
+        return v.isoformat() if v else "v0"
+
+    def agg_snapshot(self, cache_key: str) -> dict | None:
+        """캐시키 스냅샷 — {data_version, logic_version, payload} 또는 None."""
+        row = AggregateSnapshot.objects.filter(cache_key=cache_key).first()
+        if row is None:
+            return None
+        return {"data_version": row.data_version,
+                "logic_version": row.logic_version, "payload": row.payload}
+
+    def save_agg_snapshot(self, cache_key: str, data_version: str,
+                          logic_version: int, payload) -> None:
+        """캐시키 스냅샷 저장/갱신(키 unique → 1키 1행, 재계산 시 덮어씀)."""
+        AggregateSnapshot.objects.update_or_create(
+            cache_key=cache_key,
+            defaults={"data_version": data_version,
+                      "logic_version": logic_version, "payload": payload})

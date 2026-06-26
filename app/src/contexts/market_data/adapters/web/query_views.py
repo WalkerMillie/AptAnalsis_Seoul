@@ -4,26 +4,21 @@
 수집(collection_job)과 같은 스토어를 합성루트에서 공유받는다.
 """
 
-from datetime import datetime, timedelta, timezone
-
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from contexts.market_data.adapters.web.composition import get_trade_query
 
-_KST = timezone(timedelta(hours=9))
-
 
 class TickerView(APIView):
     """GET /api/market_data/ticker/ — 상단 전광판(급등 상위 30 + 구별 중앙값).
 
-    KST 기준 '오늘' 스냅샷을 쓴다(없으면 첫 호출 때 1회 생성). 전 페이지 공통 크롬이라
-    매 진입 풀스캔하던 걸 하루 1회로 줄임.
+    결과 스냅샷 캐시(data_version 키). 데이터 변경(갱신/backfill) 시에만 1회 재계산,
+    이후 즉답. 전 페이지 공통 크롬이라 매 진입 풀스캔하던 걸 제거.
     """
 
     def get(self, request):
-        today = datetime.now(_KST).date()
-        return Response(get_trade_query().ticker(today))
+        return Response(get_trade_query().ticker())
 
 
 class DongListView(APIView):
@@ -107,7 +102,7 @@ class RegionSummaryView(APIView):
             mt = int(request.query_params.get("min_trades", 10))
         except (TypeError, ValueError):
             mt = 10
-        return Response(get_trade_query().region_summary(_months(request), max(1, min(1000, mt))))
+        return Response(get_trade_query().region_summary_cached(_months(request), max(1, min(1000, mt))))
 
 
 class RankingView(APIView):
@@ -120,7 +115,7 @@ class RankingView(APIView):
             except (TypeError, ValueError):
                 v = default
             return max(lo, min(hi, v))
-        return Response(get_trade_query().rank_complexes(
+        return Response(get_trade_query().rankings_cached(
             months=_months(request),
             min_trades=_int("min_trades", 10, 1, 1000),
             limit=_int("limit", 100, 1, 500)))
@@ -144,7 +139,7 @@ class CandidateMetricsView(APIView):
             mt = int(request.query_params.get("min_trades", 10))
         except (TypeError, ValueError):
             mt = 10
-        return Response(get_trade_query().candidate_metrics(
+        return Response(get_trade_query().candidates_cached(
             _months(request), max(1, min(1000, mt))))
 
 
