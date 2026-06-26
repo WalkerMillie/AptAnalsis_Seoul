@@ -5,10 +5,11 @@ from django.urls import path
 from contexts.market_data.adapters.web.query_views import (
     CandidateMetricsView, ComplexListView, ComplexScoreView, DongListView, DongSearchView,
     JeonseRatioView, JeonseSeriesView, PriceGrowthView, PriceSeriesView, RankingView,
-    RegionSummaryView, TradeListView,
+    RegionSummaryView, TickerView, TradeListView,
 )
 
 urlpatterns = [
+    path("ticker/", TickerView.as_view(), name="market_data_ticker"),
     path("dongs/", DongListView.as_view(), name="market_data_dongs"),
     path("complexes/", ComplexListView.as_view(), name="market_data_complexes"),
     path("trades/", TradeListView.as_view(), name="market_data_trades"),

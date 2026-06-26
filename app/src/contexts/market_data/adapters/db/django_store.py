@@ -14,7 +14,7 @@ from django.db.models import Count, Max
 from contexts.market_data.domain.trade import Trade
 from contexts.market_data.domain.jeonse_trade import JeonseTrade
 from contexts.market_data.adapters.db.models import (
-    CollectionJobRecord, TradeRecord, RentRecord)
+    CollectionJobRecord, TradeRecord, RentRecord, TickerSnapshot)
 
 
 class DjangoTradeStore:
@@ -148,3 +148,13 @@ class DjangoTradeStore:
         return list(RentRecord.objects
                     .filter(area_m2__gt=0, contract_date__gte=start)
                     .values_list("complex_id", "area_m2", "deposit"))
+
+    def ticker_snapshot(self, day: date) -> dict | None:
+        """그날(day) 티커 스냅샷 payload — 없으면 None(서비스가 생성)."""
+        row = TickerSnapshot.objects.filter(snapshot_date=day).first()
+        return row.payload if row else None
+
+    def save_ticker_snapshot(self, day: date, payload: dict) -> None:
+        """그날 스냅샷 저장(동시 첫 호출 경합은 unique로 흡수 — 먼저 쓴 게 남음)."""
+        TickerSnapshot.objects.get_or_create(
+            snapshot_date=day, defaults={"payload": payload})

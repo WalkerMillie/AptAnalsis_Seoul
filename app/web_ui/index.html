@@ -1713,13 +1713,11 @@ $('themeToggle').onclick=()=>applyTheme(
 // ===== 상단 티커 (실데이터: 단지 상승률 + 구별 중앙값) =====
 async function buildTicker(){
   try{
-    const [rk, rs] = await Promise.all([
-      jget('/api/market_data/rankings/?months=24&min_trades=10&limit=15'),
-      jget('/api/market_data/region_summary/?months=24&min_trades=10'),
-    ]);
-    const movers=(rk.ranked||[]).slice(0,15).map(c=>
+    // 전용 엔드포인트(일 1회 스냅샷) — 매 페이지 풀스캔 2종 대신. 급등 상위 30 + 구별 중앙값.
+    const t = await jget('/api/market_data/ticker/');
+    const movers=(t.movers||[]).map(c=>
       `<span class="tk"><b>${c.apt_name}</b> <span class="${c.growth>=0?'up':'down'}">${c.growth>=0?'▲ +':'▼ -'}${pct(Math.abs(c.growth))}</span></span>`);
-    const regs=Object.entries(rs.regions||{}).sort((a,b)=>b[1].median_growth-a[1].median_growth)
+    const regs=Object.entries(t.regions||{}).sort((a,b)=>b[1].median_growth-a[1].median_growth)
       .map(([code,v])=>`<span class="tk">${(districtName[code]||code).replace('구','')} <span class="${v.median_growth>=0?'up':'down'}">${v.median_growth>=0?'+':''}${pct(v.median_growth)}</span></span>`);
     const html=movers.concat(regs).join('');
     const tk=$('tkTrack');

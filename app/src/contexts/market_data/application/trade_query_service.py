@@ -366,6 +366,36 @@ class TradeQueryService:
         return {"months": months, "min_trades": min_trades,
                 "total": len(out), "candidates": out[:limit]}
 
+    # 티커 스냅샷 기준 윈도우(상단 전광판 전용, 고정). 사용자 기간(months)과 무관.
+    _TICKER_MONTHS = 24
+    _TICKER_TOP = 30
+
+    def ticker(self, day) -> dict:
+        """상단 티커 payload — 그날 스냅샷 있으면 그대로, 없으면 1회 계산 후 저장.
+
+        매 페이지 진입마다 전국 풀스캔 2종(rankings·region_summary @24mo)을 재계산하던 걸
+        하루 1회로 줄인다(backfill 사이 불변). 데이터는 가볍게 급등 상위 30 + 구별 중앙값만.
+        store가 스냅샷 포트를 구현하지 않으면(인메모리 등) 매번 즉석 계산으로 폴백.
+        """
+        get_snap = getattr(self._store, "ticker_snapshot", None)
+        if get_snap is not None:
+            cached = get_snap(day)
+            if cached is not None:
+                return cached
+        rk = self.rank_complexes(months=self._TICKER_MONTHS, min_trades=10,
+                                 limit=self._TICKER_TOP)
+        rs = self.region_summary(months=self._TICKER_MONTHS, min_trades=10)
+        payload = {
+            "date": day.isoformat() if hasattr(day, "isoformat") else str(day),
+            "movers": [{"apt_name": c["apt_name"], "growth": c["growth"]}
+                       for c in rk.get("ranked", [])],
+            "regions": rs.get("regions", {}),
+        }
+        save_snap = getattr(self._store, "save_ticker_snapshot", None)
+        if save_snap is not None:
+            save_snap(day, payload)
+        return payload
+
     def region_summary(self, months: int = 12, min_trades: int = 10) -> dict:
         """구(region_code)별 단지 상승률 중앙값 — 지도 색칠(choropleth)용.
 
