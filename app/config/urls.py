@@ -11,6 +11,8 @@ urlpatterns = [
     path("analyze", index, name="ui_analyze"),
     path("explore", index, name="ui_explore"),
     path("reco", index, name="ui_reco"),
+    path("watchlist", index, name="ui_watchlist"),
+    path("compare", index, name="ui_compare"),
     path("data/complex_geo", complex_geo, name="ui_complex_geo"),
     path("mockups/", mockups, name="ui_mockups"),
     path("mockups/<str:name>", mockups, name="ui_mockup"),
@@ -18,5 +20,5 @@ urlpatterns = [
     path("api/analysis/", include("contexts.analysis.adapters.web.urls")),
     path("api/market_data/", include("contexts.market_data.adapters.web.urls")),
     path("api/market_data/", include("contexts.market_data.adapters.web.query_urls")),
-    # 후속: watchlist 어댑터도 여기 마운트
+    path("api/watchlist/", include("contexts.watchlist.adapters.web.urls")),
 ]

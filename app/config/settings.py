@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "rest_framework",
     "contexts.market_data.adapters.db",   # 실거래 영속 어댑터(Django ORM)
+    "contexts.watchlist.adapters.db",     # 관심 단지(즐겨찾기) 영속 어댑터
 ]
 
 MIDDLEWARE = [
