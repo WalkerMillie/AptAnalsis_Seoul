@@ -432,15 +432,15 @@
     </div>
   </div>
   <nav class="nav" id="tabs">
-    <button data-view="analyze" class="on">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16"/><path d="M14 9h4a1 1 0 0 1 1 1v11"/><path d="M8 8h2M8 12h2M8 16h2"/></svg>
-      단지분석</button>
-    <button data-view="explore">
+    <button data-view="explore" class="on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>
       지도·랭킹</button>
     <button data-view="reco">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="10" cy="7" r="2.2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="2.2" fill="currentColor" stroke="none"/></svg>
       맞춤추천</button>
+    <button data-view="analyze">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16"/><path d="M14 9h4a1 1 0 0 1 1 1v11"/><path d="M8 8h2M8 12h2M8 16h2"/></svg>
+      단지분석</button>
     <button data-view="watchlist">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.3 6.2 20.5l1.1-6.5L2.6 9.4l6.5-.9L12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z"/></svg>
       관심·비교</button>
@@ -496,7 +496,7 @@
 </div>
 
 <!-- ===================== VIEW 1: 단지분석 ===================== -->
-<div class="view on" id="vAnalyze">
+<div class="view" id="vAnalyze">
   <div class="v1">
 
     <!-- LEFT: 단지 선택 -->
@@ -593,7 +593,7 @@
 </div>
 
 <!-- ===================== VIEW 2: 지도·랭킹 ===================== -->
-<div class="view" id="vExplore">
+<div class="view on" id="vExplore">
   <div class="panel" style="margin-bottom:14px">
     <div class="phead"><span class="acc"></span>서울 어디가 오르나 <span class="r">CHOROPLETH · RANKING</span></div>
     <div style="padding:12px; display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap">
@@ -1793,7 +1793,7 @@ function drawCompare(){
 }
 
 // ===== 뷰 전환 (상단 탭) =====
-let _view='analyze';                                        // 현재 뷰(URL 경로와 동기)
+let _view='explore';                                        // 현재 뷰(URL 경로와 동기). 기본 진입=지도·랭킹
 function showView(name, scroll=true){
   _view = name;                                             // 현재 뷰(URL 경로와 동기)
   const id = 'v' + name[0].toUpperCase() + name.slice(1);   // analyze→vAnalyze
@@ -1809,7 +1809,7 @@ const _loaded={explore:false, reco:false};  // 뷰 1회 로드 플래그(재방�
 // watchlist·compare는 _loaded 캐시 안 함 — 데이터·선택이 매번 달라 진입 시 항상 새로 렌더.
 function viewFromPath(){
   const seg=location.pathname.replace(/^\/+/,'').split('/')[0];
-  return VIEWS.includes(seg)? seg : 'analyze';
+  return VIEWS.includes(seg)? seg : 'explore';   // 루트/미지정 → 기본 진입=지도·랭킹
 }
 function setMonthSeg(m){
   $('monthsSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on', +x.dataset.m===m));
@@ -1900,7 +1900,7 @@ async function applyFromURL(){      // 현재 URL → 화면 복원(부팅·뒤�
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>navView(b.dataset.view));
 // 키보드 F1/F2/F3 — 터미널 감성
 document.addEventListener('keydown',e=>{
-  const map={F1:'analyze',F2:'explore',F3:'reco'};
+  const map={F1:'explore',F2:'reco',F3:'analyze',F4:'watchlist'};   // 헤더 순서와 일치
   if(map[e.key]){ e.preventDefault(); navView(map[e.key]); }
 });
 window.addEventListener('popstate', applyFromURL);
