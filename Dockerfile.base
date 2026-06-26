@@ -1,0 +1,28 @@
+# 서울 아파트 분석 — 베이스 이미지(느린 의존성 레이어 고정).
+# node22 + claude CLI + 파이썬 의존성(requirements.txt)을 미리 구워 둔다.
+# requirements.txt가 바뀌지 않는 한 앱 빌드(Dockerfile)는 이 베이스를 그대로 재사용 →
+# COPY app/ 레이어만 다시 타므로 수 초에 끝난다.
+# requirements.txt가 바뀌었을 때만 이 베이스를 재빌드한다(scripts/build.sh가 자동 판단).
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DJANGO_SETTINGS_MODULE=config.settings
+
+WORKDIR /app
+
+# slim 이미지엔 CA 번들이 없어 MOLIT(https) TLS 검증이 실패한다 → ca-certificates 설치.
+# AI 코멘트(AI_PROVIDER=cli)는 컨테이너 안에서 `claude -p`를 직접 돌리므로 node + claude CLI 내장.
+# 자격증명은 런타임에 k8s Secret으로 /secrets/claude 에 마운트(entrypoint가 HOME으로 복사).
+ARG CLAUDE_CLI_VERSION=2.1.181
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @anthropic-ai/claude-code@${CLAUDE_CLI_VERSION} \
+    && npm cache clean --force \
+    && apt-get purge -y gnupg && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# 파이썬 의존성도 베이스에 고정. requirements.txt 변경 시에만 이 베이스를 재빌드한다.
+COPY app/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt

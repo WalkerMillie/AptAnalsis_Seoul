@@ -5,6 +5,19 @@ set -e
 
 cd /app
 
+# AI 코멘트(AI_PROVIDER=cli) 자격증명 셋업 — k8s Secret을 read-only로 마운트(/secrets/claude)하면
+# 쓰기 가능한 HOME으로 복사한다. claude CLI가 만료 토큰을 refreshToken으로 갱신하며 파일에
+# 되써야 하기 때문(read-only 마운트 직접 사용 불가). 온보딩 마커도 심어 -p 비대화 실행을 보장.
+if [ -f /secrets/claude/.credentials.json ]; then
+  mkdir -p "$HOME/.claude"
+  cp /secrets/claude/.credentials.json "$HOME/.claude/.credentials.json"
+  chmod 600 "$HOME/.claude/.credentials.json"
+  [ -f "$HOME/.claude.json" ] || echo '{"hasCompletedOnboarding":true}' > "$HOME/.claude.json"
+  echo "▶ claude 자격증명 셋업 완료 (AI_PROVIDER=${AI_PROVIDER:-cli})"
+else
+  echo "▶ /secrets/claude 없음 — AI 코멘트는 graceful-fail(나머지 기능 정상)"
+fi
+
 echo "▶ migrate"
 python manage.py migrate --noinput
 
